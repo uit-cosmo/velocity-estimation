@@ -33,9 +33,6 @@ def corr_fun(x, y, dt, norm=True, biased=True, method="auto"):
     k = np.arange(-(length - 1), length)
     times = k * dt
 
-    if biased:
-        ccf /= length
-    else:
-        ccf /= length - np.abs(k)
+    ccf /= length if biased else length - np.abs(k)
 
     return times, ccf

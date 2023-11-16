@@ -2,9 +2,9 @@ import warnings
 
 import numpy as np
 from scipy.stats import gamma, rv_continuous
-import fppanalysis.correlation_function as cf
-from fppanalysis.conditional_averaging import cond_av
-from fppanalysis import utils
+from velocity_estimation import conditional_averaging as cond_av
+from velocity_estimation import correlation as cf
+from velocity_estimation import utils
 import matplotlib.pyplot as plt
 from scipy.stats import uniform, norm
 from scipy.signal import fftconvolve
@@ -680,7 +680,7 @@ def estimate_time_delay_ccond_av_max(
     """
     x_t = np.arange(0, dt * len(x), dt)
 
-    _, s_av, s_var, t_av, peaks, _ = cond_av(
+    _, s_av, s_var, t_av, peaks, _ = cond_av.cond_av(
         x,
         x_t,
         smin=cond_av_eo.min_threshold,

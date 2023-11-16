@@ -1,7 +1,7 @@
 import numpy as np
-import fppanalysis.time_delay_estimation as tde
-import fppanalysis.two_dim_velocity_estimates as td
-import fppanalysis.utils as u
+import velocity_estimation.time_delay_estimation as tde
+import velocity_estimation.two_dim_velocity_estimates as td
+import velocity_estimation.utils as u
 import test_utils as tu
 import xarray as xr
 
@@ -20,7 +20,10 @@ def test_rad_and_pol():
     pd = td.estimate_velocities_for_pixel(
         1, 1, u.SyntheticBlobImagingDataInterface(ds), estimation_options
     )
-    (v_est, w_est,) = (
+    (
+        v_est,
+        w_est,
+    ) = (
         pd.vx,
         pd.vy,
     )
@@ -43,7 +46,10 @@ def test_rad_and_neg_pol():
     pd = td.estimate_velocities_for_pixel(
         1, 1, u.SyntheticBlobImagingDataInterface(ds), get_estimation_options()
     )
-    (v_est, w_est,) = (
+    (
+        v_est,
+        w_est,
+    ) = (
         pd.vx,
         pd.vy,
     )
@@ -57,7 +63,10 @@ def test_rad_and_2pol():
     pd = td.estimate_velocities_for_pixel(
         1, 1, u.SyntheticBlobImagingDataInterface(ds), get_estimation_options()
     )
-    (v_est, w_est,) = (
+    (
+        v_est,
+        w_est,
+    ) = (
         pd.vx,
         pd.vy,
     )
@@ -75,7 +84,10 @@ def test_cond_av():
     pd = td.estimate_velocities_for_pixel(
         1, 1, u.SyntheticBlobImagingDataInterface(ds), estimation_options
     )
-    (v_est, w_est,) = (
+    (
+        v_est,
+        w_est,
+    ) = (
         pd.vx,
         pd.vy,
     )
@@ -109,7 +121,10 @@ def test_ignore_dead_pixels():
     pd = td.estimate_velocities_for_pixel(
         1, 1, u.SyntheticBlobImagingDataInterface(mock_ds), get_estimation_options()
     )
-    (v_est, w_est,) = (
+    (
+        v_est,
+        w_est,
+    ) = (
         pd.vx,
         pd.vy,
     )
@@ -128,7 +143,10 @@ def test_neighbours():
     pd = td.estimate_velocities_for_pixel(
         0, 0, u.SyntheticBlobImagingDataInterface(ds), estimation_options
     )
-    (v_est, w_est,) = (
+    (
+        v_est,
+        w_est,
+    ) = (
         pd.vx,
         pd.vy,
     )
@@ -144,7 +162,10 @@ def test_cross_corr_fit():
     pd = td.estimate_velocities_for_pixel(
         1, 1, u.SyntheticBlobImagingDataInterface(ds), eo
     )
-    (v_est, w_est,) = (
+    (
+        v_est,
+        w_est,
+    ) = (
         pd.vx,
         pd.vy,
     )

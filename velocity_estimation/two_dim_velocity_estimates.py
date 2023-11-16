@@ -1,7 +1,7 @@
 import warnings
 
-import fppanalysis.time_delay_estimation as tde
-from fppanalysis import utils
+import velocity_estimation.time_delay_estimation as tde
+from velocity_estimation import utils
 import numpy as np
 from dataclasses import dataclass
 

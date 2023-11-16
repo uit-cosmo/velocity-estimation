@@ -1,7 +1,7 @@
 import numpy as np
 
-import fppanalysis.time_delay_estimation as tde
-import fppanalysis.utils as u
+import velocity_estimation.time_delay_estimation as tde
+import velocity_estimation.utils as u
 import test_utils as tu
 
 

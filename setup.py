@@ -18,7 +18,7 @@ setup(
     url="https://github.com/uit-cosmo/velocity-estimation",
     download_url="https://github.com/uit-cosmo/velocity-estimation/archive/refs/tags/1.1.tar.gz",
     license="MiT",
-    version="1.3",
+    version="1.0.0",
     packages=["velocity_estimation"],
     python_requires=">=3.0",
     install_requires=[

@@ -4,6 +4,7 @@ import velocity_estimation.time_delay_estimation as tde
 from velocity_estimation import utils
 import numpy as np
 from dataclasses import dataclass
+from velocity_estimation.correlation import corr_fun
 
 
 @dataclass
@@ -65,6 +66,8 @@ class EstimationOptions:
         cc_options: tde.CCOptions = tde.CCOptions(),
         ca_options: tde.CAOptions = tde.CAOptions(),
         ccf_options: tde.CCFitOptions = tde.CCFitOptions(),
+        start: float = None,
+        end: float = None,
     ):
         """Estimation options for velocity estimation method.
 
@@ -76,6 +79,8 @@ class EstimationOptions:
         - cc_options: Cross correlation estimation options to be used if method = TDEMethod.CC
         - ca_options: Conditional average estimation options to be used if method = TDEMethod.CA
         - ccf_options: Time delay estimation options to be used if method = TDEMethod.CCFit
+        - start: Start of the time interval to be employed, if None all the provided interval will be used.
+        - end: End of the time interval to be employed, if None all the provided interval will be used.
         """
         self.method = method
         self.use_3point_method = use_3point_method
@@ -84,6 +89,8 @@ class EstimationOptions:
         self.cc_options = cc_options
         self.ca_options = ca_options
         self.ccf_options = ccf_options
+        self.start = start
+        self.end = end
 
     def get_time_delay_options(self):
         match self.method:
@@ -103,7 +110,9 @@ class EstimationOptions:
             f"Neighbor Options: {self.neighbour_options}, "
             f"CC Options: {str(self.cc_options)}, "
             f"CA Options: {str(self.ca_options)}, "
-            f"CCF Options: {str(self.ccf_options)}"
+            f"CCF Options: {str(self.ccf_options)}, "
+            f"start: {str(self.start)}, "
+            f"end: {str(self.end)}"
         )
 
 
@@ -163,6 +172,8 @@ class MovieData:
             estimation_options.method,
             estimation_options.get_time_delay_options(),
             estimation_options.cache,
+            estimation_options.start,
+            estimation_options.end,
         )
         self.pixels = [[PixelData() for _ in range_r] for _ in range_z]
 
@@ -321,25 +332,27 @@ def _estimate_velocities_given_points(
 
 
 def _check_ccf_constrains(
-    p0, p1, ds: utils.ImagingDataInterface, neighbors_ccf_min_lag: int
+    p0,
+    p1,
+    ds: utils.ImagingDataInterface,
+    neighbors_ccf_min_lag: int,
+    start=None,
+    end=None,
 ):
     """Returns true if the time lag that maximizes the cross-correlation
     function measure at p0 and p1 is not zero."""
-    import fppanalysis.correlation_function as cf
 
     if ds.is_pixel_dead(p1[0], p1[1]):
         return False
 
-    signal0 = ds.get_signal(p0[0], p0[1])
-    signal1 = ds.get_signal(p1[0], p1[1])
+    signal0 = ds.get_signal(p0[0], p0[1], start, end)
+    signal1 = ds.get_signal(p1[0], p1[1], start, end)
 
     # No need to compute the ccf if the min lag is 0
     if neighbors_ccf_min_lag == 0:
         return True
 
-    ccf_times, ccf = cf.corr_fun(
-        signal0, signal1, dt=ds.get_dt(), biased=True, norm=True
-    )
+    ccf_times, ccf = corr_fun(signal0, signal1, dt=ds.get_dt(), biased=True, norm=True)
     ccf = ccf[np.abs(ccf_times) < max(ccf_times) / 2]
     ccf_times = ccf_times[np.abs(ccf_times) < max(ccf_times) / 2]
     max_index = np.argmax(ccf)
@@ -447,6 +460,8 @@ def estimate_velocities_for_pixel(
             estimation_options.method,
             estimation_options.get_time_delay_options(),
             estimation_options.cache,
+            estimation_options.start,
+            estimation_options.end,
         )
 
     results = [

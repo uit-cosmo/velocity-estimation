@@ -1,8 +1,7 @@
 import numpy as np
 from abc import ABC
-from typing import Tuple, Any
+from typing import Tuple
 import xarray as xr
-from numpy import ndarray, dtype
 
 
 class ImagingDataInterface(ABC):
@@ -11,8 +10,11 @@ class ImagingDataInterface(ABC):
         and z direction."""
         raise NotImplementedError
 
-    def get_signal(self, x: int, y: int) -> np.ndarray:
-        """Returns an array containing the time series at indexes x, y."""
+    def get_signal(
+        self, x: int, y: int, start: float = None, end: float = None
+    ) -> np.ndarray:
+        """Returns an array containing the time series at indexes x, y for times
+        between start and end."""
         raise NotImplementedError
 
     def get_dt(self) -> float:
@@ -45,8 +47,12 @@ class CModImagingDataInterface(ImagingDataInterface):
     def get_shape(self) -> Tuple[int, int]:
         return self.ds.dims["x"], self.ds.dims["y"]
 
-    def get_signal(self, x: int, y: int) -> np.ndarray:
-        return self.ds.isel(x=x, y=y)["frames"].values
+    def get_signal(
+        self, x: int, y: int, start: float = None, end: float = None
+    ) -> np.ndarray:
+        if start is None:
+            return self.ds.isel(x=x, y=y)["frames"].values
+        return self.ds.sel(x=x, y=y, time=slice(start, end))["frames"].values
 
     def get_dt(self) -> float:
         times = self.ds["time"]
@@ -70,8 +76,12 @@ class SyntheticBlobImagingDataInterface(ImagingDataInterface):
     def get_shape(self) -> Tuple[int, int]:
         return self.ds.dims["x"], self.ds.dims["y"]
 
-    def get_signal(self, x: int, y: int) -> np.ndarray:
-        return self.ds.isel(x=x, y=y)["n"].values
+    def get_signal(
+        self, x: int, y: int, start: float = None, end: float = None
+    ) -> np.ndarray:
+        if start is None:
+            return self.ds.isel(x=x, y=y)["n"].values
+        return self.ds.isel(x=x, y=y).sel(t=slice(start, end))["n"].values
 
     def get_dt(self) -> float:
         times = self.ds["t"]

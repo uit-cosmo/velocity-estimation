@@ -241,3 +241,23 @@ def test_non_orthogonal_points():
     )
     vx = movie_data.get_vx()
     assert np.max(np.abs(vx - np.ones(shape=(2, 2)))) < 0.1, "Numerical error too big"
+
+
+def test_rad_and_pol_times():
+    v, w = 1, 1
+    ds = tu.make_2d_realization(v, w, np.array([5, 6, 7]), np.array([5, 6, 7]))
+    estimation_options = get_estimation_options()
+    estimation_options.start = 100
+    estimation_options.end = 200
+    pd = td.estimate_velocities_for_pixel(
+        1, 1, u.SyntheticBlobImagingDataInterface(ds), estimation_options
+    )
+    (
+        v_est,
+        w_est,
+    ) = (
+        pd.vx,
+        pd.vy,
+    )
+    error = np.max([abs(v_est - v), abs(w_est - w)])
+    assert error < 0.1, "Numerical error too big"

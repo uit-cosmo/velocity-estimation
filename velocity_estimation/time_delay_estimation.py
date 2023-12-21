@@ -315,10 +315,12 @@ class TDEMethod(Enum):
 
 
 class TDEDelegator:
-    def __init__(self, method: TDEMethod, options, cache):
+    def __init__(self, method: TDEMethod, options, cache, start=None, end=None):
         self.method = method
         self.options = options
         self.cache = cache
+        self.start = start
+        self.end = end
         self.results = {}
 
     def estimate_time_delay(self, p1, p0, ds: utils.ImagingDataInterface):
@@ -351,8 +353,8 @@ class TDEDelegator:
 
     def estimate_time_delay_uncached(self, p1, p0, ds: utils.ImagingDataInterface):
         extra_debug_info = "between pixels {} and {}".format(p1, p0)
-        x = ds.get_signal(p1[0], p1[1])
-        y = ds.get_signal(p0[0], p0[1])
+        x = ds.get_signal(p1[0], p1[1], self.start, self.end)
+        y = ds.get_signal(p0[0], p0[1], self.start, self.end)
         dt = ds.get_dt()
 
         if ds.is_pixel_dead(p0[0], p0[1]) or ds.is_pixel_dead(p1[0], p1[1]):

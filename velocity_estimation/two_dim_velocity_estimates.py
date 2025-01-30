@@ -68,7 +68,7 @@ class EstimationOptions:
     ):
         """Estimation options for velocity estimation method.
 
-        - method: fppanalysis.time_delay_estimation.TDEMethod Specifies the time delay method to be used.
+        - method: time_delay_estimation.TDEMethod Specifies the time delay method to be used.
         - use_3point_method: [bool] If False, use 2 point method to estimate velocities from time delays.
 
         - cache: bool, if True TDE results are cached
@@ -325,7 +325,7 @@ def _check_ccf_constrains(
 ):
     """Returns true if the time lag that maximizes the cross-correlation
     function measure at p0 and p1 is not zero."""
-    import fppanalysis.correlation_function as cf
+    import correlation as cf
 
     if ds.is_pixel_dead(p1[0], p1[1]):
         return False

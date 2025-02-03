@@ -1,5 +1,4 @@
 blobmodel==1.0.1
-fppanalysis==0.1.4
 matplotlib==3.8.1
 numpy==2.2.2
 scipy==1.15.1

@@ -2,12 +2,11 @@
 
 # -- Project information
 
-project = 'Lumache'
-copyright = '2021, Graziella'
-author = 'Graziella'
+project = 'velocity_estimation'
+copyright = '2025, Juan'
+author = 'Juan Manuel Losada'
 
-release = '0.1'
-version = '0.1.0'
+release = '1.0.0'
 
 # -- General configuration
 
@@ -26,6 +25,7 @@ intersphinx_mapping = {
 intersphinx_disabled_domains = ['std']
 
 templates_path = ['_templates']
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # -- Options for HTML output
 

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "velocity_estimation"
+version = "1.0.0"
+description = "Two dimensional velocity estimation methods for imaging data"
+authors = [{name = "Juan Manuel Losada", email = "juan.m.losada@uit.no"}]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3"
+dependencies = [
+    "blobmodel",
+    "numpy",
+    "xarray",
+    "matplotlib",
+    "netcdf4",
+    "black",
+    "sphinx",
+    "sphinx-rtd-theme",
+    "scipy",
+]
+
+[tool.setuptools]
+packages = ["velocity_estimation"]

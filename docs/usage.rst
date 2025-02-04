@@ -7,7 +7,7 @@ Usage
 Experimental data
 ++++++++++++++++
 
-Retrieve data on xarray format with the functions from `cmod_functions <https://github.com/uit-cosmo/cmod_functions>`.
+Retrieve data on xarray format with the functions from `cmod_functions <https://github.com/uit-cosmo/cmod_functions>`_.
 Then load the data for example:
 
 .. code-block:: python

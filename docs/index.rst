@@ -20,3 +20,4 @@ Contents
 
     Installing <install>
     usage
+    estimation_options

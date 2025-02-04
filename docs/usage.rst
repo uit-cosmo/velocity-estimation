@@ -1,4 +1,4 @@
-.. _usage:
+.. _velocity_estimation-usage:
 
 Usage
 ===============

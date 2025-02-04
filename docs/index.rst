@@ -16,4 +16,4 @@ Contents
 
 .. toctree::
    Installing <install>
-   Usage
+   usage

@@ -4,6 +4,7 @@ import velocity_estimation.time_delay_estimation as tde
 from velocity_estimation import utils
 import numpy as np
 from dataclasses import dataclass
+import correlation as cf
 
 
 @dataclass
@@ -325,8 +326,6 @@ def _check_ccf_constrains(
 ):
     """Returns true if the time lag that maximizes the cross-correlation
     function measure at p0 and p1 is not zero."""
-    import fppanalysis.correlation_function as cf
-
     if ds.is_pixel_dead(p1[0], p1[1]):
         return False
 

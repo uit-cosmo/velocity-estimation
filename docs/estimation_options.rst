@@ -36,6 +36,7 @@ The class ``EstimationOptions`` allows to set the parameters for the estimation,
 
 As you can see, many of these options are also package classes, as ``NeighbourOptions`` or ``NeighbourOptions``. These are further explained below. Note that the member ``method`` is used to specify which method is employed for time-delay estimation (TDE), these can be based on cross-correlation (CC), conditional averaging (CA) and cross-correlation fitting (CCf), once this is set only the options pertaining the relevant method will be used (``cc_options``, ``ca_options`` or ``ccf_options``).
 
+.. _velocity_estimation-estimation_options-neighbour:
 Neighbour Options
 ===============
 
@@ -58,6 +59,7 @@ Used for neighbour selection
      - int(1)
      - Maximum allowed separation
 
+.. _velocity_estimation-estimation_options-cc:
 CC Options
 ===============
 
@@ -88,6 +90,7 @@ Used if the time-delay estimation is based on cross-correlations (``method=tde.T
      - If True, maximizing time lags found by interpolation
 
 
+.. _velocity_estimation-estimation_options-ca:
 CA Options
 ===============
 
@@ -121,6 +124,7 @@ Used if the time-delay estimation is based on conditional averaging (``method=td
      - If True prints event info
 
 
+.. _velocity_estimation-estimation_options-ccf:
 CCF Options
 ===============
 

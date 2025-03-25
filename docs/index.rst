@@ -30,10 +30,10 @@ and :math:`P_x`, and between :math:`P_0` and :math:`P_y`, respectively. Maximiza
 In standard imaging data, where more than three pixels are available, there are several combinations of three pixels that can be made starting from a reference pixel :math:`P_0`: one can go right and down, as shown in the image, but also right and up, or left and down, etc. The code is configured to take all possible combinations of pixels (typically four, but only two on the edges, and one in the corners), then it computes the velocities for each of them assuming that the data from each pixel fulfills some data-quality requirements, and lastly the estimated velocity for that reference pixel is estimated as the average over all estimated velocities.
 With this in mind, we can roughly divide the algorithm in the following steps:
 
-1. For each pixels :math:`P` in the dataset:
-2. Find all horizontal and vertical neighbours of :math:`P` satisfying some user-defined :ref:`NeighbourOptions`}.
+1. For each pixel :math:`P` in the dataset:
+2. Find all horizontal and vertical neighbours of :math:`P` satisfying some user-defined :ref:`velocity_estimation-neighbour_selection`}.
 3. For each combination of [:math:`P` + one horizontal neighbour + one vertical neighbour]:
-    1. Estimate the time delays, :math:`\widehat{\tau}_x` and :math:`\widehat{\tau}_y`, between the signal measured at $P$ and each auxiliary points with some user-defined :ref:`EstimationOptions`.
+    1. Estimate the time delays, :math:`\widehat{\tau}_x` and :math:`\widehat{\tau}_y`, between the signal measured at :math:`P` and each auxiliary points with some user-defined :ref:`EstimationOptions`.
     2. It the time delay estimation succeeds, estimate the velocity components following a user defined velocity estimation option.
 4. Average over all successful velocity estimations and assign the resulting velocity to :math:`P`.
 
@@ -42,6 +42,11 @@ This and the relevant options are summarize in the next figure:
 .. image:: options.png
    :align: center
    :scale: 80%
+
+Each set of options is described in each section:
+
+1. :ref:`velocity_estimation-neighbour_selection`.
+2. :ref:`velocity_estimation-estimation_options-neighbour`.
 
 Contents
 --------

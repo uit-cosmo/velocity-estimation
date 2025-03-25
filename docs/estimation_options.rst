@@ -59,6 +59,7 @@ Used for neighbour selection
      - int(1)
      - Maximum allowed separation
 
+.. _velocity_estimation-estimation_options-cc:
 CC Options
 ===============
 
@@ -89,6 +90,7 @@ Used if the time-delay estimation is based on cross-correlations (``method=tde.T
      - If True, maximizing time lags found by interpolation
 
 
+.. _velocity_estimation-estimation_options-ca:
 CA Options
 ===============
 
@@ -122,6 +124,7 @@ Used if the time-delay estimation is based on conditional averaging (``method=td
      - If True prints event info
 
 
+.. _velocity_estimation-estimation_options-ccf:
 CCF Options
 ===============
 

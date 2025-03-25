@@ -31,7 +31,7 @@ In standard imaging data, where more than three pixels are available, there are 
 With this in mind, we can roughly divide the algorithm in the following steps:
 
 1. For each pixel :math:`P` in the dataset:
-2. Find all horizontal and vertical neighbours of :math:`P` satisfying some user-defined :ref:`velocity_estimation-neighbour_selection`}.
+2. Find all horizontal and vertical neighbours of :math:`P` satisfying some user-defined :ref:`velocity_estimation-neighbour_selection`.
 3. For each combination of [:math:`P` + one horizontal neighbour + one vertical neighbour]:
     1. Estimate the time delays, :math:`\widehat{\tau}_x` and :math:`\widehat{\tau}_y`, between the signal measured at :math:`P` and each auxiliary points with some user-defined :ref:`EstimationOptions`.
     2. It the time delay estimation succeeds, estimate the velocity components following a user defined velocity estimation option.
@@ -45,8 +45,10 @@ This and the relevant options are summarize in the next figure:
 
 Each set of options is described in each section:
 
-1. :ref:`velocity_estimation-neighbour_selection`.
-2. :ref:`velocity_estimation-estimation_options-neighbour`.
+1. :ref:`velocity_estimation-estimation_options-neighbour`.
+1. :ref:`velocity_estimation-estimation_options-cc`.
+1. :ref:`velocity_estimation-estimation_options-ca`.
+1. :ref:`velocity_estimation-estimation_options-ccf`.
 
 Contents
 --------

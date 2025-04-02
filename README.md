@@ -7,6 +7,8 @@ Two dimensional velocity estimation methods for coarse-grained imaging data. Tra
   data. The underlying time delay estimation can be switched from cross-correlation analysis or cross-conditional
   averaging.
 
+Documentation [here](https://velocity-estimation.readthedocs.io/en/latest/).
+
 # Install
 
 ```

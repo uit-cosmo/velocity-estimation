@@ -4,7 +4,7 @@ import velocity_estimation.time_delay_estimation as tde
 from velocity_estimation import utils
 import numpy as np
 from dataclasses import dataclass
-import correlation as cf
+import velocity_estimation.correlation as cf
 
 
 @dataclass

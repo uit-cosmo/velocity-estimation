@@ -17,6 +17,7 @@ dependencies = [
     "matplotlib",
     "netcdf4",
     "black",
+    "plasmapy",
     "sphinx",
     "sphinx-rtd-theme",
     "scipy",

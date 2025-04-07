@@ -110,18 +110,15 @@ Used if the time-delay estimation is based on conditional averaging (``method=td
    * - max_threshold
      - float(np.inf)
      - max threshold for conditional averaged events
-   * - delta
+   * - length_of_return
      - float(None)
-     - If window = True, delta is the minimal distance between two peaks.
-   * - window
-     - bool(False)
-     - If True, delta also gives the minimal distance between peaks.
+     - float, length of recorded events. If `None`, estimated as ``len(signal) / len(number_of_events) * time_step``.
+   * - distance
+     - float(0)
+     - minimum distance between peaks
    * - interpolate
      - bool(False)
      - If True the maximizing time lags are found by interpolation.
-   * - verbose
-     - bool(False)
-     - If True prints event info
 
 
 .. _velocity_estimation-estimation_options-ccf:
@@ -131,7 +128,7 @@ CCF Options
 Used if the time-delay estimation is based on cross-correlation fitting (``method=tde.TDEMethod.CCF``)
 
 
-.. list-table:: CAOptions
+.. list-table:: CCFitOptions
    :widths: 25 25 50
    :header-rows: 1
 

@@ -2,7 +2,6 @@ import warnings
 
 import numpy as np
 from scipy.stats import gamma, rv_continuous
-from velocity_estimation import conditional_averaging as cond_av
 from velocity_estimation import correlation as cf
 from velocity_estimation import utils
 import matplotlib.pyplot as plt
@@ -10,6 +9,7 @@ from scipy.stats import uniform, norm
 from scipy.signal import fftconvolve
 from dataclasses import dataclass
 from enum import Enum
+from plasmapy.analysis.time_series.conditional_averaging import ConditionalEvents
 
 
 def get_average(params: np.ndarray, distribution: rv_continuous):
@@ -235,31 +235,28 @@ class CAOptions:
         self,
         min_threshold: float = 2.5,
         max_threshold: float = np.inf,
-        delta: float = None,
-        window: bool = False,
+        length_of_return: float = None,
+        distance: float = 0,
         interpolate: bool = False,
-        verbose: bool = False,
     ):
         """
-        - min_threshold: min threshold for conditional averaged events
-        - max_threshold: max threshold for conditional averaged events
-        - delta: If window = True, delta is the minimal distance between two peaks.
-        - window: [bool] If True, delta also gives the minimal distance between peaks.
+        - min_threshold: float, min threshold for conditional averaged events
+        - max_threshold: float, max threshold for conditional averaged events
+        - length_of_return: float, length of recorded events
+        - distance: float, minimum distance between peaks
         - interpolate: If True the maximizing time lags are found by interpolation.
-        - verbose: If True prints event info
         """
         self.min_threshold = min_threshold
         self.max_threshold = max_threshold
-        self.delta = delta
-        self.window = window
+        self.length_of_return = length_of_return
+        self.distance = distance
         self.interpolate = interpolate
-        self.verbose = verbose
 
     def __str__(self):
         """Return a string representation of the CAOptions object."""
         return (
-            f"Min Threshold: {self.min_threshold}, Max Threshold: {self.max_threshold}, Delta: {self.delta},"
-            f" Window: {self.window}, Interpolate: {self.interpolate}, Verbose: {self.verbose}"
+            f"Min Threshold: {self.min_threshold}, Max Threshold: {self.max_threshold}, Length Of Return: {self.length_of_return},"
+            f" Distance: {self.distance}, Interpolate: {self.interpolate}"
         )
 
 
@@ -680,24 +677,26 @@ def estimate_time_delay_ccond_av_max(
     """
     x_t = np.arange(0, dt * len(x), dt)
 
-    _, s_av, s_var, t_av, peaks, _ = cond_av.cond_av(
-        x,
-        x_t,
-        smin=cond_av_eo.min_threshold,
-        smax=cond_av_eo.max_threshold,
-        Sref=y,
-        delta=cond_av_eo.delta,
-        window=cond_av_eo.window,
-        print_verbose=False,
+    ce = ConditionalEvents(
+        signal=x,
+        time=x_t,
+        lower_threshold=cond_av_eo.min_threshold,
+        upper_threshold=cond_av_eo.max_threshold,
+        reference_signal=y,
+        length_of_return=cond_av_eo.length_of_return,
+        distance=cond_av_eo.distance,
     )
-    max_index = np.argmax(s_av)
+    average_event = ce.average
+    time_base = ce.time
+
+    max_index = np.argmax(average_event)
     return_time = (
-        _find_maximum_interpolate(t_av, s_av, extra_debug_info)
+        _find_maximum_interpolate(time_base, average_event, extra_debug_info)
         if cond_av_eo.interpolate
-        else t_av[max_index]
+        else time_base[max_index]
     )
 
-    return return_time, s_var[max_index], len(peaks)
+    return return_time, ce.variance[max_index], ce.number_of_events
 
 
 def get_avg_velocity_from_time_delays(

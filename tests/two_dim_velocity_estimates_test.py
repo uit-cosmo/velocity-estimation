@@ -78,7 +78,7 @@ def test_cond_av():
     v, w = 1, -1
     ds = tu.make_2d_realization(v, w, np.array([5, 6, 7]), np.array([5, 6, 7]))
     estimation_options = get_estimation_options()
-    cond_av_eo = tde.CAOptions(delta=5, window=True)
+    cond_av_eo = tde.CAOptions(length_of_return=5, distance=5, min_threshold=0.6)
     estimation_options.method = tde.TDEMethod.CA
     estimation_options.ca_options = cond_av_eo
     pd = td.estimate_velocities_for_pixel(

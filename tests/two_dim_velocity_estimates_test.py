@@ -15,18 +15,13 @@ def get_estimation_options():
 
 def test_rad_and_pol():
     v, w = 1, 1
-    ds = tu.make_2d_realization(v, w, np.array([5, 6, 7]), np.array([5, 6, 7]))
+    synthetic_dataset = tu.make_2d_realization(
+        v, w, np.array([5, 6, 7]), np.array([5, 6, 7])
+    )
+    dataset_wrapper = u.SyntheticBlobImagingDataInterface(synthetic_dataset)
     estimation_options = get_estimation_options()
-    pd = td.estimate_velocities_for_pixel(
-        1, 1, u.SyntheticBlobImagingDataInterface(ds), estimation_options
-    )
-    (
-        v_est,
-        w_est,
-    ) = (
-        pd.vx,
-        pd.vy,
-    )
+    pd = td.estimate_velocities_for_pixel(1, 1, dataset_wrapper, estimation_options)
+    v_est, w_est = pd.vx, pd.vy
     error = np.max([abs(v_est - v), abs(w_est - w)])
     assert error < 0.1, "Numerical error too big"
 

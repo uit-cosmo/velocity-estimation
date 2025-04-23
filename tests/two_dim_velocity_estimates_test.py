@@ -13,6 +13,7 @@ def get_estimation_options():
     )
 
 
+# BEGIN EXAMPLE velocity_estimation
 def test_rad_and_pol():
     v, w = 1, 1
     synthetic_dataset = tu.make_2d_realization(
@@ -24,6 +25,7 @@ def test_rad_and_pol():
     v_est, w_est = pd.vx, pd.vy
     error = np.max([abs(v_est - v), abs(w_est - w)])
     assert error < 0.1, "Numerical error too big"
+# END EXAMPLE velocity_estimation
 
 
 def test_full():

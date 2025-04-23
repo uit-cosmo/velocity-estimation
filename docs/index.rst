@@ -46,9 +46,9 @@ This and the relevant options are summarize in the next figure:
 Each set of options is described in each section:
 
 1. :ref:`velocity_estimation-estimation_options-neighbour`.
-1. :ref:`velocity_estimation-estimation_options-cc`.
-1. :ref:`velocity_estimation-estimation_options-ca`.
-1. :ref:`velocity_estimation-estimation_options-ccf`.
+2. :ref:`velocity_estimation-estimation_options-cc`.
+3. :ref:`velocity_estimation-estimation_options-ca`.
+4. :ref:`velocity_estimation-estimation_options-ccf`.
 
 Contents
 --------
@@ -60,3 +60,4 @@ Contents
     Installing <install>
     usage
     estimation_options
+    synthetic_data

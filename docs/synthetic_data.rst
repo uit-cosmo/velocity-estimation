@@ -11,4 +11,4 @@ of `blobmodel`.
 .. literalinclude:: ../tests/example_test.py
    :language: python
    :start-after: # BEGIN EXAMPLE velocity_estimation
-   :end-before: # END EXAMPLE velocity_estimation
+   :end-before: # END EXAMPLE  velocity_estimation

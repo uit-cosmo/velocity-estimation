@@ -43,7 +43,7 @@ class CModImagingDataInterface(ImagingDataInterface):
         self.ds = ds
 
     def get_shape(self) -> Tuple[int, int]:
-        return self.ds.dims["x"], self.ds.dims["y"]
+        return self.ds.sizes["x"], self.ds.sizes["y"]
 
     def get_signal(self, x: int, y: int) -> np.ndarray:
         return self.ds.isel(x=x, y=y)["frames"].values
@@ -68,7 +68,7 @@ class SyntheticBlobImagingDataInterface(ImagingDataInterface):
         self.ds = ds
 
     def get_shape(self) -> Tuple[int, int]:
-        return self.ds.dims["x"], self.ds.dims["y"]
+        return self.ds.sizes["x"], self.ds.sizes["y"]
 
     def get_signal(self, x: int, y: int) -> np.ndarray:
         return self.ds.isel(x=x, y=y)["n"].values

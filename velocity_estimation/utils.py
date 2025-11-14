@@ -39,7 +39,7 @@ class CModImagingDataInterface(ImagingDataInterface):
     """Implementation of ImagingDataInterface for xarray datasets given by the
     code at https://github.com/sajidah-ahmed/cmod_functions."""
 
-    def __init__(self, ds: xr.Dataset, mask: xr.DataArray):
+    def __init__(self, ds: xr.Dataset, mask: xr.DataArray = None):
         self.ds = ds
         self.mask = mask
 
@@ -57,6 +57,8 @@ class CModImagingDataInterface(ImagingDataInterface):
         return self.ds.R.isel(x=x, y=y).values, self.ds.Z.isel(x=x, y=y).values
 
     def is_pixel_dead(self, x: int, y: int) -> bool:
+        if self.mask is None:
+            return False
         return self.mask.isel(x=x, y=y).item()
 
 

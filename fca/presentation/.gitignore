@@ -1,0 +1,6 @@
+media/
+slides/
+.venv/
+*.html
+*_assets/
+__pycache__/

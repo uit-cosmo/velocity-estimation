@@ -174,62 +174,28 @@ def test_cross_corr_fit():
 
 
 def test_non_orthogonal_points():
-    from blobmodel import Model, DefaultBlobFactory
-
-    T = 1000
-    K = 1000
-    Lx = 10
-    Ly = 10
-    taup = 1e10
-    dt = 0.01
-
+    """Pixels on a sheared grid, (0, 5) and (1, 5) in one row, (1.5, 6) and (2.5, 6)
+    in the next: picked from one realization on the fine uniform grid
+    x = 0, 0.5, ..., 2.5, y = 5, 6, and handed to the pipeline in the imaging
+    layout frames(y, x, time) with 2-D coordinates R, Z."""
     vx, vy = 1, 1
+    x_fine = np.arange(0, 3, 0.5)
+    ds = tu.make_2d_realization(vx, vy, x_fine, np.array([5.0, 6.0]))
 
-    bf = DefaultBlobFactory(
-        A_dist="deg",
-        vx_dist="deg",
-        vy_dist="deg",
-        vy_parameter=vy,
-        vx_parameter=vx,
-    )
-    bm = Model(
-        Nx=10,
-        Ny=1,
-        Lx=Lx,
-        Ly=Ly,
-        dt=dt,
-        T=T,
-        num_blobs=K,
-        blob_shape="gauss",
-        periodic_y=True,
-        t_drain=taup,
-        blob_factory=bf,
-    )
-
-    times = np.arange(0, T, dt)
-    x = np.array([0.0, 1.0])
-    y = np.array([5.0, 6.0])
-
-    x_matrix, y_matrix, t_matrix = np.meshgrid(x, y, times)
-    x_matrix[1, 0, :] = 1.5
-    x_matrix[1, 1, :] = 2.5
-
-    bm._geometry.x_matrix = x_matrix
-    bm._geometry.y_matrix = y_matrix
-    bm._geometry.t_matrix = t_matrix
-    bm._geometry.Ny = len(y)
-    bm._geometry.Nx = len(x)
-    bm._geometry.x = x
-    bm._geometry.y = y
-
-    ds = bm.make_realization(speed_up=True, error=10e-2)
+    # Columns of x_fine holding the two pixels of each row: x = 0, 1 at y = 5 and
+    # x = 1.5, 2.5 at y = 6.
+    columns = np.array([[0, 2], [3, 5]])
+    n = ds["n"].values
+    frames = np.stack([n[row, columns[row], :] for row in range(2)])
+    R = x_fine[columns]
+    Z = np.repeat(ds.y.values[:, np.newaxis], 2, axis=1)
 
     ds_new = xr.Dataset(
-        {"frames": (["y", "x", "time"], ds.n.values)},
+        {"frames": (["y", "x", "time"], frames)},
         coords={
-            "R": (["y", "x"], x_matrix[:, :, 0]),
-            "Z": (["y", "x"], y_matrix[:, :, 0]),
-            "time": (["time"], times),
+            "R": (["y", "x"], R),
+            "Z": (["y", "x"], Z),
+            "time": (["time"], ds.t.values),
         },
     )
 

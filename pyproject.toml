@@ -11,7 +11,6 @@ license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3"
 dependencies = [
-    "blobmodel",
     "numpy",
     "xarray",
     "matplotlib",
@@ -22,6 +21,9 @@ dependencies = [
     "sphinx-rtd-theme",
     "scipy",
 ]
+
+[project.optional-dependencies]
+test = ["blobmodel>=2.1.0", "pytest"]
 
 [tool.setuptools]
 packages = ["velocity_estimation"]

@@ -1,4 +1,4 @@
-blobmodel==1.0.1
+blobmodel>=2.1.0
 matplotlib==3.10
 numpy==2.2.2
 plasmapy==v2024.10.0

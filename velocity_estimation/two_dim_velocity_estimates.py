@@ -1,9 +1,11 @@
 import warnings
 
 import velocity_estimation.time_delay_estimation as tde
+import velocity_estimation.full_correlation_analysis as fca
 from velocity_estimation import utils
 import numpy as np
 from dataclasses import dataclass
+from enum import Enum
 import velocity_estimation.correlation as cf
 
 
@@ -55,6 +57,19 @@ class NeighbourOptions:
         )
 
 
+class VelocityMethod(Enum):
+    """Velocity estimation methods.
+
+    TDE = time delays, 2- or 3-point according to use_3point_method,
+    CROSSING = crossing times with W^-1 = I, the velocity component along each separation,
+    FCA = crossing times corrected by the measured pulse shape (full correlation analysis)
+    """
+
+    TDE = 1
+    CROSSING = 2
+    FCA = 3
+
+
 @dataclass
 class EstimationOptions:
     def __init__(
@@ -62,29 +77,43 @@ class EstimationOptions:
         method: tde.TDEMethod = tde.TDEMethod.CC,
         use_3point_method: bool = True,
         cache: bool = True,
-        neighbour_options: NeighbourOptions = NeighbourOptions(),
-        cc_options: tde.CCOptions = tde.CCOptions(),
-        ca_options: tde.CAOptions = tde.CAOptions(),
-        ccf_options: tde.CCFitOptions = tde.CCFitOptions(),
+        neighbour_options: NeighbourOptions = None,
+        cc_options: tde.CCOptions = None,
+        ca_options: tde.CAOptions = None,
+        ccf_options: tde.CCFitOptions = None,
+        velocity_method: VelocityMethod = VelocityMethod.TDE,
+        fca_options: fca.FCAOptions = None,
     ):
         """Estimation options for velocity estimation method.
 
         - method: fppanalysis.time_delay_estimation.TDEMethod Specifies the time delay method to be used.
         - use_3point_method: [bool] If False, use 2 point method to estimate velocities from time delays.
 
-        - cache: bool, if True TDE results are cached
+        - cache: bool, if True TDE results and correlations are cached
         - neighbour_options: NeighbourOptions Options used for neighbour selection
         - cc_options: Cross correlation estimation options to be used if method = TDEMethod.CC
         - ca_options: Conditional average estimation options to be used if method = TDEMethod.CA
         - ccf_options: Time delay estimation options to be used if method = TDEMethod.CCFit
+        - velocity_method: VelocityMethod, time delays (TDE, the default), crossing times (CROSSING) or
+        full correlation analysis (FCA). method, use_3point_method and the time delay options are only
+        used by TDE.
+        - fca_options: FCAOptions Options of the CROSSING and FCA methods
+
+        Option arguments left as None are built with their defaults, one instance per EstimationOptions.
         """
         self.method = method
         self.use_3point_method = use_3point_method
         self.cache = cache
-        self.neighbour_options = neighbour_options
-        self.cc_options = cc_options
-        self.ca_options = ca_options
-        self.ccf_options = ccf_options
+        self.neighbour_options = (
+            neighbour_options if neighbour_options is not None else NeighbourOptions()
+        )
+        self.cc_options = cc_options if cc_options is not None else tde.CCOptions()
+        self.ca_options = ca_options if ca_options is not None else tde.CAOptions()
+        self.ccf_options = (
+            ccf_options if ccf_options is not None else tde.CCFitOptions()
+        )
+        self.velocity_method = velocity_method
+        self.fca_options = fca_options if fca_options is not None else fca.FCAOptions()
 
     def get_time_delay_options(self):
         match self.method:
@@ -98,13 +127,15 @@ class EstimationOptions:
     def __str__(self):
         """Return a string representation of the EstimationOptions object."""
         return (
+            f"Velocity Method: {self.velocity_method}, "
             f"Method: {self.method}, "
             f"Use 3-Point Method: {self.use_3point_method}, "
             f"Cache: {self.cache}, "
             f"Neighbor Options: {self.neighbour_options}, "
             f"CC Options: {str(self.cc_options)}, "
             f"CA Options: {str(self.ca_options)}, "
-            f"CCF Options: {str(self.ccf_options)}"
+            f"CCF Options: {str(self.ccf_options)}, "
+            f"FCA Options: {str(self.fca_options)}"
         )
 
 
@@ -115,13 +146,15 @@ class PixelData:
     vx: Radial velocities
     vy: Poloidal velocities
     confidences:
-        if method='cross_corr':
+        if method='cross_corr', CROSSING or FCA:
             Maximum value of the cross-correlations at each pixel.
         if method='cond_av':
             Conditional variance value at maximum cross conditional average for each pixel.
     R: Radial positions
     Z: Poloidal positions
     is_dead: True if pixel is dead
+    l1, l2: Major and minor widths of the pulse autocorrelation, FCA only (NaN otherwise)
+    tilt: Angle of its long axis from the radial coordinate, radians in (-pi/2, pi/2], FCA only
     """
 
     r_pos: float = 0
@@ -131,6 +164,9 @@ class PixelData:
     confidence: float = 0
     events: int = 0
     is_dead: bool = False
+    l1: float = np.nan
+    l2: float = np.nan
+    tilt: float = np.nan
 
 
 class MovieData:
@@ -149,6 +185,7 @@ class MovieData:
         R: Radial positions
         Z: Poloidal positions
         is_dead: True if pixel is dead
+        l1, l2, tilt: Widths and tilt of the pulse autocorrelation, FCA only (NaN otherwise)
 
     Dead pixels have empty PixelData (null vx and vy).
     """
@@ -165,6 +202,9 @@ class MovieData:
             estimation_options.get_time_delay_options(),
             estimation_options.cache,
         )
+        self.correlation_delegator = fca.CorrelationDelegator(
+            estimation_options.fca_options, estimation_options.cache
+        )
         self.pixels = [[PixelData() for _ in range_r] for _ in range_z]
 
         for i in range_z:
@@ -175,7 +215,12 @@ class MovieData:
         i, j = items[0], items[1]
         try:
             return estimate_velocities_for_pixel(
-                i, j, self.ds, self.estimation_options, self.tde_delegator
+                i,
+                j,
+                self.ds,
+                self.estimation_options,
+                self.tde_delegator,
+                self.correlation_delegator,
             )
         except:
             print(
@@ -211,6 +256,15 @@ class MovieData:
 
     def get_is_dead(self):
         return self._get_field("is_dead")
+
+    def get_l1(self):
+        return self._get_field("l1")
+
+    def get_l2(self):
+        return self._get_field("l2")
+
+    def get_tilt(self):
+        return self._get_field("tilt")
 
 
 def get_2d_velocities_from_time_delays(
@@ -396,12 +450,93 @@ def _find_neighbors(
     return horizontal, vertical
 
 
+def _estimate_velocities_from_crossings(
+    x,
+    y,
+    h_neighbors,
+    v_neighbors,
+    ds: utils.ImagingDataInterface,
+    estimation_options: EstimationOptions,
+    correlation_delegator: fca.CorrelationDelegator,
+):
+    """Crossing time and FCA estimates for the reference pixel (x, y): one pooled fit over its
+    neighbours. The crossing time of the reference with each neighbour gives one equation for
+    the velocity. For the FCA, the zero-lag correlations of the reference with each neighbour
+    and of each horizontal neighbour with each vertical one give the shape W^-1 that corrects
+    the crossing equations; the crossing method uses the identity instead. Both a horizontal
+    and a vertical neighbour are required."""
+    r_pos, z_pos = ds.get_position(x, y)
+    if len(h_neighbors) == 0 or len(v_neighbors) == 0:
+        return PixelData(r_pos=r_pos, z_pos=z_pos)
+
+    def separation(p1, p0):
+        r1, z1 = ds.get_position(p1[0], p1[1])
+        r0, z0 = ds.get_position(p0[0], p0[1])
+        return float(r1) - float(r0), float(z1) - float(z0)
+
+    p0 = (x, y)
+    neighbours = h_neighbors + v_neighbors
+    lags, r_auto_0 = correlation_delegator.autocorrelation(p0, ds)
+    separations, crossing_times, maxima = [], [], []
+    for p1 in neighbours:
+        _, r_auto_1 = correlation_delegator.autocorrelation(p1, ds)
+        _, r_cross = correlation_delegator.cross_correlation(p1, p0, ds)
+        tau = fca.crossing_time(lags, (r_auto_0 + r_auto_1) / 2, r_cross)
+        if np.isnan(tau):
+            warnings.warn(
+                "Cross-correlation not below the autocorrelation at zero lag, no crossing time"
+                " between pixels {} and {}".format(p1, p0)
+            )
+            continue
+        separations.append(separation(p1, p0))
+        crossing_times.append(tau)
+        maxima.append(np.max(r_cross))
+
+    if estimation_options.velocity_method == VelocityMethod.FCA:
+        pairs = [(p1, p0) for p1 in neighbours]
+        pairs += [(pv, ph) for ph in h_neighbors for pv in v_neighbors]
+        shape_separations, r0 = [], []
+        for p1, p2 in pairs:
+            r = correlation_delegator.zero_lag_correlation(p1, p2, ds)
+            if r >= estimation_options.fca_options.minimum_correlation:
+                shape_separations.append(separation(p1, p2))
+                r0.append(r)
+        w_inv = fca.shape_from_zero_lag(shape_separations, r0)
+        if w_inv is None:
+            warnings.warn(
+                f"Zero-lag correlations do not determine a positive definite shape for pixel {p0}"
+            )
+            return PixelData(r_pos=r_pos, z_pos=z_pos)
+    else:
+        w_inv = np.eye(2)
+
+    v = fca.velocity_from_crossings(separations, crossing_times, w_inv)
+    if v is None:
+        warnings.warn(
+            "Crossing times do not determine the velocity for pixel {}".format(p0)
+        )
+        return PixelData(r_pos=r_pos, z_pos=z_pos)
+
+    pixel_data = PixelData(
+        r_pos=r_pos,
+        z_pos=z_pos,
+        vx=float(v[0]),
+        vy=float(v[1]),
+        confidence=float(min(maxima)),
+        events=0,
+    )
+    if estimation_options.velocity_method == VelocityMethod.FCA:
+        pixel_data.l1, pixel_data.l2, pixel_data.tilt = fca.shape_parameters(w_inv)
+    return pixel_data
+
+
 def estimate_velocities_for_pixel(
     x,
     y,
     ds: utils.ImagingDataInterface,
-    estimation_options: EstimationOptions = EstimationOptions(),
+    estimation_options: EstimationOptions = None,
     tde_delegator: tde.TDEDelegator = None,
+    correlation_delegator: fca.CorrelationDelegator = None,
 ):
     """Estimates radial and poloidal velocity for a pixel with indexes x,y
     using all four possible combinations of nearest neighbour pixels (x-1, y),
@@ -420,17 +555,26 @@ def estimate_velocities_for_pixel(
     the confidence of the estimation is a value in the interval (0, 1) given by the
     cross conditional variance for each event. OBS: We return 1-CV for cross conditional variance.
 
+    With velocity_method CROSSING or FCA, the velocity comes instead from one pooled fit of the
+    crossing times of the reference with its neighbours, corrected by the pulse shape measured
+    from the zero-lag correlations in the FCA case (see full_correlation_analysis). The confidence
+    is the smallest maximum of the cross-correlations involved, and the FCA fills in l1, l2 and tilt.
+
     Input:
         x: pixel index x
         y: pixel index y
         ds: xarray Dataset
         estimation_options: EstimationOptions class including all estimation parameters, if not set
         the method will be based on cross-correlation function.
+        tde_delegator, correlation_delegator: caches shared between pixels, built here if not given.
 
 
     Returns:
         PixelData: Object containing radial and poloidal velocities and method-specific data.
     """
+    if estimation_options is None:
+        estimation_options = EstimationOptions()
+
     r_pos, z_pos = ds.get_position(x, y)
 
     # If the reference pixel is dead, return empty data right away
@@ -440,6 +584,24 @@ def estimate_velocities_for_pixel(
     h_neighbors, v_neighbors = _find_neighbors(
         x, y, ds, estimation_options.neighbour_options
     )
+
+    if estimation_options.velocity_method in (
+        VelocityMethod.CROSSING,
+        VelocityMethod.FCA,
+    ):
+        if correlation_delegator is None:
+            correlation_delegator = fca.CorrelationDelegator(
+                estimation_options.fca_options, estimation_options.cache
+            )
+        return _estimate_velocities_from_crossings(
+            x,
+            y,
+            h_neighbors,
+            v_neighbors,
+            ds,
+            estimation_options,
+            correlation_delegator,
+        )
 
     if tde_delegator is None:
         tde_delegator = tde.TDEDelegator(
@@ -479,7 +641,7 @@ def estimate_velocities_for_pixel(
 
 def estimate_velocity_field(
     ds: utils.ImagingDataInterface,
-    estimation_options: EstimationOptions = EstimationOptions(),
+    estimation_options: EstimationOptions = None,
 ) -> MovieData:
     """Computes the velocity field of a given dataset ds implementing a
     utils.ImagingDataInterface class. The estimation takes into account
@@ -488,7 +650,9 @@ def estimate_velocity_field(
     the right neighbour and the down neighbour. The velocities are estimated
     from a time delay estimation performed by maximizing either the cross-
     correlation function or cross conditional average function, which is
-    specified in input argument 'method'.
+    specified in input argument 'method', or, with velocity_method CROSSING or
+    FCA, from the crossing times of the correlations (see
+    estimate_velocities_for_pixel).
 
     If time delay estimation is performed by maximizing the cross correlation function,
     the confidence of the estimation is a value in the interval (0, 1) given by the
@@ -511,5 +675,7 @@ def estimate_velocity_field(
     Returns:
         movie_data: Class containing estimation data about all pixels
     """
+    if estimation_options is None:
+        estimation_options = EstimationOptions()
 
     return MovieData(ds, estimation_options)

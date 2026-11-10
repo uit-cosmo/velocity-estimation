@@ -182,9 +182,8 @@ on the noisy realizations of case 10.
 
 ## Dependencies
 
-- **blobmodel 2.1.0 is not released.** It is on `main` of uit-cosmo/2d-propagating-blobs (pyproject version 2.1.0),
-  but the last tag, GitHub release and PyPI version are 2.0.0. Release it before `fca` is merged; until then the
-  repository's venv installs the checkout (`pip install -e ~/Git/2d-propagating-blobs`).
+- **blobmodel 2.1.0** was released on 2026-11-10 (tag `v2.1.0` at `b9b4a52`, GitHub release, PyPI), so
+  `blobmodel>=2.1.0` installs from PyPI.
 - blobmodel is imported only by the tests, not by the package. It moves from the runtime `dependencies` in
   `pyproject.toml` to a `test` extra (`blobmodel>=2.1.0`, `pytest`), so that imaging_methods and fusion_scripts do not
   need 2.1.0 to install velocity_estimation. `requirements.txt` gets `blobmodel>=2.1.0`, together with the author's
@@ -235,3 +234,4 @@ on the noisy realizations of case 10.
 - 2026-11-10: plan written.
 - 2026-11-10: the realization tests use blobmodel 2.1 (lifetime, start positions, tilt) instead of a generator of
   their own, at the author's request.
+- 2026-11-10: blobmodel 2.1.0 released; installed from PyPI in a fresh venv, it builds the tilted, finite-lifetime case.

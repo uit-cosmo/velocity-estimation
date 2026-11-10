@@ -146,16 +146,30 @@ Exact $R$ (fast, no realizations):
 5. Invalid inputs (collinear separations, $R(\boldsymbol{\Delta}, 0) \le 0$, $W^{-1}$ not positive definite) give `None`.
 6. Backward compatibility: the default options, `use_3point_method` set after construction, the existing tests.
 
-Realizations (the pipeline end to end): a small generator in `tests/test_utils.py` of the letter's model,
-$\Phi(\boldsymbol{x}, t) = \sum_k a_k\,\psi(\boldsymbol{x} - \boldsymbol{\xi}_k - \boldsymbol{v}(t - s_k))\,\varphi((t - s_k)/\tau_\mathrm{p})$,
-at a handful of pixels, with random positions $\boldsymbol{\xi}_k$ over a domain wider than the view by the distance a
-pulse travels in its lifetime, Gaussian envelope, tilted elliptic $\psi$. The repository's blobmodel (1.0.1) cannot
-produce these cases: it starts every pulse at $x = 0$ and decays it with the time since then, so all pulses reach a
-given pixel scaled by the same factor and the normalized $R$ shows no decorrelation; and it tilts pulses only along
-their velocity. Cases:
+Realizations (the pipeline end to end) with blobmodel 2.1, which has what the letter's model needs:
+
+- `DefaultBlobFactory(t_lifetime=...)`: the Gaussian envelope $\exp[-((t - t_\mathrm{init})/\tau_\mathrm{p})^2]$, the
+  letter's $\varphi$ with $\tau_\mathrm{p}$ = `t_lifetime`;
+- `set_sampler("posx", lambda rng, n: rng.uniform(x0 - pad, x0 + Lx + pad, n))`: start positions across a domain wider
+  than the view by a few times $v\tau_\mathrm{p}$, so that the process is homogeneous over the view (blobmodel's own
+  `docs/pulse_lifetime.rst`);
+- `set_theta_setter(lambda: alpha)` with widths `wp`, `ws`: elliptic pulses tilted from $x$ independently of
+  $\boldsymbol{v}$;
+- `periodic_y=True`, so that the view is homogeneous along $y$ too (to check when porting).
+
+The repository's blobmodel 1.0.1 cannot produce these cases: it starts every pulse at $x = 0$ and decays it with the
+time since then, so all pulses reach a given pixel scaled by the same factor and the normalized $R$ shows no
+decorrelation; and it tilts pulses only along their velocity. Checked 2026-11-10 with the `main` checkout: a 5 x 5 view,
+4000 pulses tilted 30 degrees with $\tau_\mathrm{p} = 2$, 40 000 samples, in 2 s.
+
+`tests/test_utils.make_2d_realization` is ported to the 2.x API (`Geometry`, `set_sampler`,
+`BlobShapeImpl(BlobShapeEnum.gaussian, BlobShapeEnum.gaussian)`), with parameters for the lifetime, the start-position
+pad, the widths and the tilt. Its `update_geometry`, which patches 1.x internals to place the pixels, goes: the view is a
+`Geometry` grid (`x0`, `y0`, `Nx`, `Ny`). The existing tests keep their cases and tolerances. Cases:
 
 7. Round pulses, $\boldsymbol{v} = (1, 1)$: `CROSSING` and `FCA` within the tolerance of the current 3TDE tests.
-8. A finite lifetime, $\tau_\mathrm{p} = 2\ell/v$: the 3TDE reads high by about $1 + \ell^2/v^2\tau_\mathrm{p}^2$;
+8. A finite lifetime, $\tau_\mathrm{p} = 2\ell/v$ with $\ell$ the blob width: the 3TDE reads high by about
+   $1 + \ell^2/v^2\tau_\mathrm{p}^2$;
    `CROSSING` and `FCA` within tolerance.
 9. A frozen pattern of elongated pulses tilted 30 degrees from $\boldsymbol{v}$, aspect ratio 4: the 3TDE and
    `CROSSING` off by their closed forms, `FCA` within tolerance, and the returned $\ell_1/\ell_2$ and tilt close to the
@@ -165,6 +179,16 @@ their velocity. Cases:
 
 One-off check, results recorded below: the pooled fit against the mean of per-triangle FCA solves, scatter over seeds,
 on the noisy realizations of case 10.
+
+## Dependencies
+
+- **blobmodel 2.1.0 is not released.** It is on `main` of uit-cosmo/2d-propagating-blobs (pyproject version 2.1.0),
+  but the last tag, GitHub release and PyPI version are 2.0.0. Release it before `fca` is merged; until then the
+  repository's venv installs the checkout (`pip install -e ~/Git/2d-propagating-blobs`).
+- blobmodel is imported only by the tests, not by the package. It moves from the runtime `dependencies` in
+  `pyproject.toml` to a `test` extra (`blobmodel>=2.1.0`, `pytest`), so that imaging_methods and fusion_scripts do not
+  need 2.1.0 to install velocity_estimation. `requirements.txt` gets `blobmodel>=2.1.0`, together with the author's
+  uncommitted change to it.
 
 ## Docs
 
@@ -185,7 +209,8 @@ on the noisy realizations of case 10.
 2. `full_correlation_analysis.py` with tests 1 to 5.
 3. `CorrelationDelegator` with the spike fix.
 4. Options, `PixelData` fields and the pipeline branch; test 6.
-5. The generator and tests 7 to 10.
+5. blobmodel 2.1 in the venv and the `test` extra; `make_2d_realization` ported, the existing tests passing on it;
+   tests 7 to 10.
 6. The pooled-against-triangles check; results below.
 7. Docs and version.
 8. Outside the repository: the TDE, crossing and FCA fields on a C-Mod shot through fusion_scripts, whose venv
@@ -208,3 +233,5 @@ on the noisy realizations of case 10.
 ## Log
 
 - 2026-11-10: plan written.
+- 2026-11-10: the realization tests use blobmodel 2.1 (lifetime, start positions, tilt) instead of a generator of
+  their own, at the author's request.

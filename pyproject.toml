@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "velocity_estimation"
-version = "1.0.0"
+version = "1.1.0"
 description = "Two dimensional velocity estimation methods for imaging data"
 authors = [{name = "Juan Manuel Losada", email = "juan.m.losada@uit.no"}]
 license = { file = "LICENSE" }

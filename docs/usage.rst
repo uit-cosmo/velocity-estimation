@@ -3,9 +3,9 @@
 Usage
 ===============
 
-++++++++++++++++
++++++++++++++++++
 Experimental data
-++++++++++++++++
++++++++++++++++++
 
 Retrieve data on xarray format with the functions from `cmod_functions <https://github.com/uit-cosmo/cmod_functions>`_.
 Then load the data for example:
@@ -85,3 +85,30 @@ These contain the estimated velocities components for each pixel together with t
 .. image:: velocity_field.png
    :align: center
    :scale: 80%
+
++++++++++++++++++++++++++++++++++++++++++++
+Crossing time and full correlation analysis
++++++++++++++++++++++++++++++++++++++++++++
+
+The time-delay method is one of three velocity estimators, see :ref:`velocity_estimation-estimation_options-velocity_method`. The default, ``VelocityMethod.TDE``, is the three-point method used above, so existing scripts are unchanged. The crossing time (``CROSSING``) and the full correlation analysis (``FCA``) are chosen with ``velocity_method``, either in the constructor or after it:
+
+.. code-block:: python
+
+    import velocity_estimation as ve
+
+    eo = ve.EstimationOptions(velocity_method=ve.VelocityMethod.FCA)
+    # or
+    eo = ve.EstimationOptions()
+    eo.velocity_method = ve.VelocityMethod.FCA
+
+Both read their options from ``eo.fca_options``, an ``FCAOptions`` (see :ref:`velocity_estimation-estimation_options-fca`); ``method``, ``use_3point_method`` and the TDE option classes are ignored. The neighbour selection is shared, and both need a horizontal and a vertical neighbour, as the three-point method does.
+
+``estimate_velocity_field()`` returns the same ``MovieData``. For ``CROSSING`` and ``FCA`` the ``confidence`` of a pixel is the smallest maximum of the cross-correlations of the reference pixel with its neighbours, as for the cross-correlation time delays, and ``events`` is 0. FCA also returns the shape of the zero-lag cross-correlation:
+
+.. code-block:: python
+
+    l1 = movie_data.get_l1()
+    l2 = movie_data.get_l2()
+    tilt = movie_data.get_tilt()
+
+``l1`` and ``l2``, with ``l1 >= l2``, are the :math:`e^{-1/2}` half-widths of the zero-lag cross-correlation along its principal axes, in the units of the pixel positions; for a Gaussian pulse :math:`\exp(-x^2/2\sigma^2)` they are :math:`\sqrt{2}\sigma` (blobmodel's width parameter, whose pulse is :math:`\exp(-x^2/w^2)`, is :math:`w = \sqrt{2}\sigma`, so ``l1`` and ``l2`` equal its ``wp`` and ``ws``). ``tilt`` is the angle of the long axis from the first coordinate axis (:math:`R`), in radians, in :math:`(-\pi/2, \pi/2]`. All three are NaN unless the method is FCA.

@@ -229,9 +229,118 @@ on the noisy realizations of case 10.
 - `requirements.txt` has an uncommitted change of the author's (pins relaxed to minimums), carried onto this branch
   and left uncommitted.
 
+## Results
+
+Filled in as the steps complete (2026-11-10).
+
+### Step 5: the realization tests
+
+- blobmodel's Gaussian pulse is $\exp(-\theta^2)$, so its width parameter is the letter's $\ell$ directly ($\ell_1 = $
+  `wp`, $\ell_2 = $ `ws`), and the lifetime of case 8 for $w = 1$, $\boldsymbol{v} = (1, 1)$ is
+  $\tau_\mathrm{p} = 2\ell/|\boldsymbol{v}| = \sqrt{2}$. Measured 3TDE reading over 8 seeds: $1.252 \pm 0.012$ times
+  $\boldsymbol{v}$ against the closed form 1.25; the crossing time and FCA read $\boldsymbol{v}$ within 0.05.
+- Case 9 (aspect ratio 4, 30 degrees from $\boldsymbol{v} = (1, 1)$): keeping $R(\boldsymbol{\Delta}, 0)$ above
+  `minimum_correlation` on the diagonal pairs needs $\ell_2 \geq 0.66$ pixels, hence $\ell_1 = 2.8$ pixels, and the
+  FCA's $v_y$ is then ill-conditioned: the $y$ pair lies 15 degrees from the long axis ($R = 0.88$), its crossing is
+  shallow, and $W$ amplifies the error of $\ln R$ by $\ell_1^2\sin^2\theta \approx 7$. Scatter over 8 seeds at
+  $K = 2000$: 0.12 on $v_y$ (0.05 on $v_x$), largest error 0.27. The test bounds the FCA error by 0.4 (3.3 sigma; the
+  barber-pole errors are 1.1 for the 3TDE and 1.9 for the crossing time) and checks $\ell_1/\ell_2$ within 20 % and the
+  tilt within 0.1 rad. A second, well-conditioned tilted case (aspect ratio 2, $\ell_1 = 1$, $\ell_2 = 0.5$,
+  $\theta = 30$ degrees, $\boldsymbol{v} = (1, 0)$) checks the 3TDE and the crossing time within 0.1 of their closed
+  forms and the FCA within 0.1 of $\boldsymbol{v}$. The conditioning is now listed under the docs' limitations.
+- Case 10: for noise variances up to the signal's, the velocity bias without the spike fix is at most 10 % (a neighbour
+  with noise fraction $f$ against a noise-free reference moves the crossing to $R_\mathrm{cross}/R_\mathrm{auto} =
+  (2 + f)/2\sqrt{1 + f}$), straddling the 0.1 tolerance (measured 0.08 to 0.12 over seeds), while $\ell_1$, $\ell_2$
+  read 20 % low. The test asserts the ordering of the errors with and without the fix, the biased interval and the
+  low widths; with the fix the FCA reads $\boldsymbol{v}$ within 0.04 and the widths within 5 %.
+- Homogeneity along $y$: blobmodel ties the periodic cell to the grid, and a cell as short as the view would make the
+  mirror copies overlap the pulses, so `make_2d_realization` sets the geometry's `Ly` (10 by default, at least the view
+  plus three widths on each side) after construction, with the view as the grid. Measured per-pixel means and variances
+  agree with the Poisson expectations within the statistical error (largest z-score 2.1 over 9 pixels and 10 seeds).
+- `test_cond_av` passed in the baseline (blobmodel 1.0.1) and on 2.1; it is marginal (6 to 11 events) and fails in
+  about 8 % of seeds. Not addressed.
+
+### Step 6: the pooled fit against the mean of per-triangle solves
+
+On the noisy realizations of case 10 (10 seeds, round pulses, $K = 1000$, $T = 1000$; the per-triangle FCA solves the
+shape from the three pairs of one (horizontal, vertical) triangle and the velocity from its two crossings, exactly
+determined, on the same correlations as the pooled fit):
+
+| quantity | pooled: mean error, std over seeds | triangle mean: mean error, std | spread of the 4 triangles | pooled minus triangle mean |
+|---|---|---|---|---|
+| $v_x$ | 0.006, 0.020 | 0.006, 0.020 | 0.038 | $-0.0009 \pm 0.0015$ |
+| $v_y$ | 0.008, 0.022 | 0.009, 0.023 | 0.039 | $-0.0014 \pm 0.0021$ |
+| $\ell_1$ | 0.022, 0.018 | 0.033, 0.014 | 0.019 | $-0.011 \pm 0.009$ |
+| $\ell_2$ | $-0.022$, 0.027 | $-0.027$, 0.022 | 0.017 | $0.004 \pm 0.008$ |
+
+- The two agree to 0.001 per velocity component, 5 % of the scatter over seeds; neither is detectably biased in
+  $\boldsymbol{v}$. With $W^{-1}$ near the identity the pooled least squares reduces to the crossing readings averaged
+  over opposite neighbours, which is the triangle mean; they differ only at second order in $W^{-1}_{xy}$.
+- The nonlinearity bias of averaging is real but small: the triangle mean's $\ell_1$ is 0.011 further above 1 and its
+  $\ell_2$ 0.004 further below (the eigenvalues of four noisier $W^{-1}$ averaged after ordering); $\sqrt{\ell_1\ell_2}$
+  is unbiased for both.
+- Pooling does not change the noise bias: without the spike fix both read $v_x = 0.91$, $v_y = 0.92$ and
+  $\ell_1, \ell_2 = 0.80, 0.77$; with it both are within 0.005 of their noise-free values seed by seed.
+- No triangle failed in 120 (no NaN crossing, no pair below `minimum_correlation`, every $W^{-1}$ positive definite),
+  so the pooled fit's robustness advantage is not exercised by this case.
+- The pooled $W^{-1}_{xx}$, $W^{-1}_{yy}$ scatter 10 to 15 % more than the triangle mean's (not significant at 10 seeds)
+  because the diagonal pairs, at $R = 0.37$, enter with the same weight as the axis pairs at $R = 0.61$; weighting the
+  shape equations by $R$ would remove this. Not done.
+
+Script and per-seed values: `scratchpad/step6/pooled_vs_triangles.py` of the session (not kept in the repository).
+
+### Step 8: C-Mod shot 1160616027 through fusion_scripts
+
+The branch (1.1.0, `64260fd`) is installed in fusion_scripts' venv in place of PyPI's 1.0.0 (restore with
+`.venv/bin/pip install --no-deps --force-reinstall velocity_estimation==1.0.0`). The three fields were run with
+`fields.load(1160616027)` and the hand-made dead-pixel mask (68 live pixels of 90; pitch 3.8 mm; $\mathrm{d}t$ = 0.5 µs,
+0.3 s; autocorrelation e-folding lag 20 µs; the white-noise spike is 3 % of the variance at the median pixel, 36 % at
+the worst). TDE as the twodca deck runs it (CC, 3-point, `minimum_cc_value` 0.5, running mean); CROSSING and FCA with
+the default `FCAOptions`. Run times 78, 78 and 95 s; no warning from the crossing or shape fits.
+
+| method | pixels | $|\boldsymbol{v}|$, m/s (median, IQR) | direction from radial (median, IQR) | median $v_r$, $v_z$ |
+|---|---|---|---|---|
+| TDE | 57 | 793 (739 to 992) | $-27.5^\circ$ ($-31.9$ to $-23.3$) | 721, $-389$ |
+| CROSSING | 59 | 494 (437 to 550) | $-25.9^\circ$ ($-35.9$ to $-16.0$) | 442, $-232$ |
+| FCA | 59 | 498 (365 to 581) | $+4.5^\circ$ ($-14.7$ to $+20.0$) | 486, $+28$ |
+
+- At the 57 common pixels $|v_\mathrm{TDE}|/|v_\mathrm{CROSS}| = 1.76$ (1.39 to 2.10) at the same direction
+  ($+1.3^\circ$): the decorrelation the letter predicts. The cross-correlation maxima lie at 1.5 to 3.5 µs, the crossing
+  times at 5 to 30 µs, against the 20 µs autocorrelation time.
+- The FCA shape: $\ell_1 = 0.89$ cm (2.4 pitches), $\ell_2 = 0.47$ cm (1.2 pitches), $\ell_1/\ell_2 = 1.9$, tilt
+  $56^\circ$ from radial; the long axis is $88^\circ$ from the TDE and crossing vectors. The FCA turns the vector by
+  $+28^\circ$ to nearly radial at the crossing's speed ($|v_\mathrm{CROSS}|/|v_\mathrm{FCA}| = 1.12$), flipping the
+  median $v_z$ from $-232$ to $+28$ m/s. Its direction scatters more (IQR $35^\circ$ against $20^\circ$ for the
+  crossing), as expected from $R(\boldsymbol{\Delta}, 0)$ of 0.76 to 0.88 at a pitch of 1.2 $\ell_2$ (the conditioning
+  limitation above).
+- Not in the plan, but decisive for reading the turn: the deck's cached 2DCA tracks on this shot, which assume neither a
+  Gaussian shape nor a frozen pattern, read $v_r \approx 506$ to 510 and $v_z \approx +1$ to $+5$ m/s. The FCA agrees
+  with them in direction ($+7^\circ$, IQR $-18$ to $+18$) and within about 15 % in speed; the TDE and crossing do not
+  ($-27^\circ$, $-25^\circ$). Evidence for the FCA's correction, not proof: the 2DCA tracks large events only.
+- Central pixel (x = 4, y = 5): $R(\boldsymbol{\Delta}, 0)$ 0.76 to 0.82 for the axis pairs, 0.55 to 0.88 for the
+  diagonals; crossing times $-4.7$, $+5.4$, $+30$, $-15$ µs; $W^{-1}$ fit over 8 pairs with an RMS residual of 0.08 in
+  $-2\ln R$; TDE (874, $-496$), CROSSING (390, $-109$), FCA (491, $+171$) m/s; the deck's 2DCA (707, $+145$).
+- Follow-ups outside this step: `max_separation` = 2 for the shape fit's conditioning, and the other shots of
+  `fields.SHOTS`. Fields, logs and the run script: `scratchpad/step8/` of the session.
+- Installation note: fusion_scripts' `decorrelation/apd_check/simulation_column.py` imports
+  `velocity_estimation.conditional_averaging`, which the repository dropped in `068bfd2` (2023) and only PyPI's 1.0.0
+  wheel still shipped (from a stale `build/` directory); the clean 1.1.0 does not have it.
+
 ## Log
 
 - 2026-11-10: plan written.
 - 2026-11-10: the realization tests use blobmodel 2.1 (lifetime, start positions, tilt) instead of a generator of
   their own, at the author's request.
 - 2026-11-10: blobmodel 2.1.0 released; installed from PyPI in a fresh venv, it builds the tilted, finite-lifetime case.
+- 2026-11-10: steps 2 to 4 done (`a73d5ee`): the module, the delegator with the spike fix, the pipeline branch, tests 1 to
+  6 (180 tests on the exact $R$).
+- 2026-11-10: step 5 done (`269733f`): blobmodel 2.1.0 in the venv and as the `test` extra, `make_2d_realization` ported,
+  tests 7 to 10 (the whole suite: 198 tests, 42 s). Deviations under Results.
+- 2026-11-10: step 7 done (`e906294`): docs, README, version 1.1.0.
+- 2026-11-10: review of the branch (eight findings; six fixed in `64260fd`: the variance guard, the direct zero-lag
+  path, `FCAOptions` as a dataclass with `__all__`, the position lookup, the unused `Lx`; two declined: dropping
+  zero-lag correlations above 1 would bias the shape fit, and falling back to the crossing where the shape fit fails
+  would mix estimators in one field, so the hole is documented instead).
+- 2026-11-10: step 6 done, results above: pooling and the triangle mean agree to 0.001 in $\boldsymbol{v}$ on case 10.
+- 2026-11-10: step 8 done, results above: on shot 1160616027 the TDE reads 1.76 times the crossing speed, and the FCA
+  turns the vector to the direction of the deck's 2DCA tracks. The branch is installed in fusion_scripts' venv.

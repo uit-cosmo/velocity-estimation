@@ -373,3 +373,4 @@ Default `FCAOptions`, 54 to 59 of 68 live pixels estimated per shot, 45 to 128 s
   merged (`b4a9f49`), its worktree removed; the note gained a Limitations bullet on the conditioning of the shape fit
   with the spaced-antenna literature (`b612cc7`); the FCA fields of the nine density-scan shots drawn through
   fusion_scripts (results above).
+- 2026-11-10: `HANDOUT_FCA.md` written: the branch summarized for the reader who has not followed it (what it adds, the decisions, the results, where things are, how to run, the literature, what is left).

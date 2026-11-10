@@ -116,3 +116,9 @@ def test_package_exports():
         "estimate_velocity_field",
     ):
         assert hasattr(ve, name)
+
+
+def test_fca_options_compare_by_value():
+    assert ve.FCAOptions() == ve.FCAOptions()
+    assert ve.FCAOptions(window=1.0) != ve.FCAOptions(window=2.0)
+    assert "window=1.0" in repr(ve.FCAOptions(window=1.0))

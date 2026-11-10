@@ -453,19 +453,22 @@ def _find_neighbors(
 def _estimate_velocities_from_crossings(
     x,
     y,
+    r_pos,
+    z_pos,
     h_neighbors,
     v_neighbors,
     ds: utils.ImagingDataInterface,
     estimation_options: EstimationOptions,
     correlation_delegator: fca.CorrelationDelegator,
 ):
-    """Crossing time and FCA estimates for the reference pixel (x, y): one pooled fit over its
-    neighbours. The crossing time of the reference with each neighbour gives one equation for
-    the velocity. For the FCA, the zero-lag correlations of the reference with each neighbour
-    and of each horizontal neighbour with each vertical one give the shape W^-1 that corrects
-    the crossing equations; the crossing method uses the identity instead. Both a horizontal
-    and a vertical neighbour are required."""
-    r_pos, z_pos = ds.get_position(x, y)
+    """Crossing time and FCA estimates for the reference pixel (x, y) at (r_pos, z_pos): one
+    pooled fit over its neighbours. The crossing time of the reference with each neighbour
+    gives one equation for the velocity. For the FCA, the zero-lag correlations of the
+    reference with each neighbour and of each horizontal neighbour with each vertical one give
+    the shape W^-1 that corrects the crossing equations; the crossing method uses the identity
+    instead. Both a horizontal and a vertical neighbour are required. Where the shape fit fails
+    the FCA gives no estimate, although the crossing times alone would: an FCA field can have
+    holes where a CROSSING field has values."""
     if len(h_neighbors) == 0 or len(v_neighbors) == 0:
         return PixelData(r_pos=r_pos, z_pos=z_pos)
 
@@ -484,8 +487,10 @@ def _estimate_velocities_from_crossings(
         tau = fca.crossing_time(lags, (r_auto_0 + r_auto_1) / 2, r_cross)
         if np.isnan(tau):
             warnings.warn(
-                "Cross-correlation not below the autocorrelation at zero lag, no crossing time"
-                " between pixels {} and {}".format(p1, p0)
+                "No crossing time between pixels {} and {}: the cross-correlation is not below"
+                " the autocorrelation at zero lag, or a variance is undefined".format(
+                    p1, p0
+                )
             )
             continue
         separations.append(separation(p1, p0))
@@ -596,6 +601,8 @@ def estimate_velocities_for_pixel(
         return _estimate_velocities_from_crossings(
             x,
             y,
+            r_pos,
+            z_pos,
             h_neighbors,
             v_neighbors,
             ds,

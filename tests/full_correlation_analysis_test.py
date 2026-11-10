@@ -335,3 +335,43 @@ def test_correlation_delegator():
     )
     assert np.allclose(r_reverse, r_direct)
     assert np.allclose(r_reverse, r_cross[::-1])
+
+
+def test_zero_lag_without_full_correlation():
+    """zero_lag_correlation computed directly, before any cross-correlation of the pair is
+    cached, equals the zero lag of the full cross-correlation."""
+    rng = np.random.default_rng(2)
+    kernel = np.exp(-np.arange(-40, 41) ** 2 / (2 * 10**2))
+    common = fftconvolve(rng.standard_normal(20_000), kernel, mode="same")
+    signals = np.stack(
+        [common + rng.standard_normal(20_000), common + rng.standard_normal(20_000)]
+    )[:, None, :]
+    ds = ArrayImagingData(signals, 0.01)
+    direct = fca.CorrelationDelegator(fca.FCAOptions(window=0.5))
+    r0 = direct.zero_lag_correlation((1, 0), (0, 0), ds)
+    assert ((1, 0), (0, 0)) not in direct._pairs
+    lags, r = fca.CorrelationDelegator(fca.FCAOptions(window=0.5)).cross_correlation(
+        (1, 0), (0, 0), ds
+    )
+    assert r0 == pytest.approx(r[np.argmin(np.abs(lags))], rel=1e-10)
+    # The reversed pair reads the cached value.
+    assert direct.zero_lag_correlation((0, 0), (1, 0), ds) == r0
+
+
+def test_non_positive_variance_gives_no_correlations():
+    """A pixel whose autocovariance is negative at the first lag (the first difference of white
+    noise: C(dt) = -C(0) / 2, C(2 dt) = 0) has a negative extrapolated variance. The delegator
+    warns and leaves its correlations undefined, so the crossing time is NaN and the pixel
+    gives no estimate instead of sign-flipped correlations."""
+    rng = np.random.default_rng(3)
+    white = rng.standard_normal(10_001)
+    signals = np.stack([np.diff(white), rng.standard_normal(10_000)])[:, None, :]
+    ds = ArrayImagingData(signals, 0.01)
+    delegator = fca.CorrelationDelegator(fca.FCAOptions(window=0.2))
+    with pytest.warns(UserWarning, match="non-positive variance"):
+        lags, r_auto = delegator.autocorrelation((0, 0), ds)
+    assert np.all(np.isnan(r_auto))
+    _, r_cross = delegator.cross_correlation((1, 0), (0, 0), ds)
+    assert np.all(np.isnan(r_cross))
+    assert np.isnan(fca.crossing_time(lags, r_auto, r_cross))
+    assert np.isnan(delegator.zero_lag_correlation((1, 0), (0, 0), ds))

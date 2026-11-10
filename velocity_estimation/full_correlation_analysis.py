@@ -17,6 +17,7 @@ at r1 at time t + tau with the reference at r0 at time t, so it peaks at tau > 0
 move from r0 to r1.
 """
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -26,28 +27,33 @@ from scipy.optimize import brentq
 from velocity_estimation import correlation as cf
 from velocity_estimation import utils
 
+__all__ = [
+    "FCAOptions",
+    "spike_free_variance",
+    "crossing_time",
+    "shape_from_zero_lag",
+    "velocity_from_crossings",
+    "shape_parameters",
+    "CorrelationDelegator",
+]
+
 
 @dataclass
 class FCAOptions:
-    def __init__(
-        self,
-        window: float = None,
-        remove_noise_spike: bool = True,
-        minimum_correlation: float = 0.1,
-    ):
-        """Options of the crossing time and FCA velocity estimates.
+    """Options of the crossing time and FCA velocity estimates.
 
-        - window: float, the correlations are computed for time lags in [-window, window]. If None,
-        100 sampling times are used, as in CCOptions.
-        - remove_noise_spike: bool, if True each pixel's variance is replaced by its autocovariance
-        extrapolated to zero lag, [4 C(dt) - C(2 dt)] / 3, which removes the spike that white noise
-        adds at zero lag, and every correlation is normalized with it.
-        - minimum_correlation: float, pairs whose zero-lag correlation is below it are left out of
-        the shape fit of the FCA.
-        """
-        self.window = window
-        self.remove_noise_spike = remove_noise_spike
-        self.minimum_correlation = minimum_correlation
+    - window: float, the correlations are computed for time lags in [-window, window]. If None,
+    100 sampling times are used, as in CCOptions.
+    - remove_noise_spike: bool, if True each pixel's variance is replaced by its autocovariance
+    extrapolated to zero lag, [4 C(dt) - C(2 dt)] / 3, which removes the spike that white noise
+    adds at zero lag, and every correlation is normalized with it.
+    - minimum_correlation: float, pairs whose zero-lag correlation is below it are left out of
+    the shape fit of the FCA.
+    """
+
+    window: float = None
+    remove_noise_spike: bool = True
+    minimum_correlation: float = 0.1
 
     def __str__(self):
         """Return a string representation of the FCAOptions object."""
@@ -101,7 +107,9 @@ def shape_from_zero_lag(separations, r0):
     (n, 2): one equation Dx^2 Wxx + 2 Dx Dy Wxy + Dy^2 Wyy = -2 ln r0 per pair. Returns the
     symmetric 2 x 2 matrix, or None with fewer than three pairs, a correlation that is not
     positive, fewer than three distinct directions among the separations, or a W^-1 that is not
-    positive definite."""
+    positive definite. A correlation above 1, which the spike-free normalization allows by
+    noise, enters as a non-positive -2 ln r0 and is kept: leaving out only the upward
+    fluctuations would bias the fit."""
     separations = np.asarray(separations, dtype=float).reshape(-1, 2)
     r0 = np.asarray(r0, dtype=float)
     if len(r0) < 3 or not np.all(r0 > 0):
@@ -154,6 +162,7 @@ class CorrelationDelegator:
         self.cache = cache
         self._pixels = {}
         self._pairs = {}
+        self._zero_lags = {}
 
     def _window(self, lags, dt):
         window = self.options.window if self.options.window is not None else 100 * dt
@@ -172,6 +181,12 @@ class CorrelationDelegator:
             variance = spike_free_variance(acov, lags)
         else:
             variance = float(acov[_zero_lag_index(lags)])
+        if not variance > 0:
+            warnings.warn(
+                "Pixel {} has a non-positive variance (its autocovariance is negative at the"
+                " first lags): its correlations are undefined".format(key)
+            )
+            variance = np.nan
         window = self._window(lags, dt)
         lags, acov = lags[window], acov[window]
         acov[_zero_lag_index(lags)] = variance
@@ -212,7 +227,26 @@ class CorrelationDelegator:
         ccov = self._cross_covariance(p1, p0, ds)
         return lags, ccov / np.sqrt(variance1 * variance0)
 
+    def _zero_lag_covariance(self, p1, p0, ds: utils.ImagingDataInterface):
+        """Covariance of the two pixels at zero lag, read off the cached cross-covariance when
+        there is one and computed directly otherwise, without the full cross-correlation.
+        """
+        key, reverse = (tuple(p1), tuple(p0)), (tuple(p0), tuple(p1))
+        for pair in (key, reverse):
+            if pair in self._pairs:
+                ccov = self._pairs[pair]
+                return float(ccov[len(ccov) // 2])
+            if pair in self._zero_lags:
+                return self._zero_lags[pair]
+        x = ds.get_signal(p1[0], p1[1])
+        y = ds.get_signal(p0[0], p0[1])
+        value = float(np.mean((x - x.mean()) * (y - y.mean())))
+        if self.cache:
+            self._zero_lags[key] = value
+        return value
+
     def zero_lag_correlation(self, p1, p0, ds: utils.ImagingDataInterface):
         """R(D, 0) of the pair."""
-        lags, r = self.cross_correlation(p1, p0, ds)
-        return float(r[_zero_lag_index(lags)])
+        _, variance1, _ = self._pixel(p1, ds)
+        _, variance0, _ = self._pixel(p0, ds)
+        return self._zero_lag_covariance(p1, p0, ds) / np.sqrt(variance1 * variance0)

@@ -82,6 +82,7 @@ Limitations
 * White noise adds a spike at zero lag to each pixel's autocovariance. ``FCAOptions.remove_noise_spike`` (on by default) replaces each pixel's variance by its autocovariance extrapolated to zero lag, which removes white noise only. Coherent pickup (in C-Mod data, the lines at 200 to 1000 kHz) and cross-talk between neighbouring channels are correlated between pixels; they raise :math:`R(\boldsymbol{\Delta}, 0)` and the cross-correlations and are not removed.
 * With a spread of velocities the shape changes with the lag, :math:`W(\tau_\mathrm{e}) = W + \Sigma_V \tau_\mathrm{e}^2`, which the zero-lag shape does not contain.
 * The extrapolation to zero lag needs a sampling time well below the correlation time.
+* The shape fit needs separations comparable to the correlation lengths. On a grid much finer than the pulses every :math:`R(\boldsymbol{\Delta}, 0)` is close to 1, and the error of :math:`\ln R` is amplified by about :math:`(\ell/\Delta)^2` in :math:`W^{-1}` and in the FCA velocity; with pulses three pixels long the FCA scatters several times more than the crossing time. Larger separations (``NeighbourOptions.max_separation``) condition the fit better, as long as the pairs across the short axis keep :math:`R(\boldsymbol{\Delta}, 0)` above ``FCAOptions.minimum_correlation``.
 
 References
 ^^^^^^^^^^

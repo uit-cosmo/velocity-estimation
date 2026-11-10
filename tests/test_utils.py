@@ -19,7 +19,6 @@ def make_2d_realization(
     ypoints,
     T=1000,
     K=1000,
-    Lx=10,
     Ly=10,
     taup=np.inf,
     dt=0.01,
@@ -62,15 +61,13 @@ def make_2d_realization(
       docs/pulse_lifetime.rst): the default pad is
       4 (|vx| t_lifetime + max(wp, ws)). Without a lifetime every pulse exists
       at all times and any seeding gives the same homogeneous flux. Either way
-      the first and last (Lx_view + 2 pad) / |vx| time units see fewer pulses,
+      the first and last (view extent + 2 pad) / |vx| time units see fewer pulses,
       since none are seeded before t = 0 or after T: a transient of about 1 %
       of T = 1000 for the default view.
 
     Each pulse is summed only while it exceeds 1e-4 of its peak (blobmodel's
     speed_up truncation).
 
-    Lx is unused: the x domain is the view. It stays in the signature so that
-    positional calls written for the blobmodel 1.x helper keep working.
     """
     xpoints = np.asarray(xpoints, dtype=float)
     ypoints = np.asarray(ypoints, dtype=float)

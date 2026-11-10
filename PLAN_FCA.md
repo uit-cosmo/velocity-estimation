@@ -326,6 +326,31 @@ the default `FCAOptions`. Run times 78, 78 and 95 s; no warning from the crossin
   `velocity_estimation.conditional_averaging`, which the repository dropped in `068bfd2` (2023) and only PyPI's 1.0.0
   wheel still shipped (from a stale `build/` directory); the clean 1.1.0 does not have it.
 
+### The density scan: FCA fields of the nine shots
+
+Through fusion_scripts' new `decorrelation/apd_check/fca_fields.py` (commit `3f97362` there; figures
+`decorrelation/apd_check/figures/fca_field_<shot>.pdf` and `fca_fields_overview.pdf`, fields cached in
+`decorrelation/cache/apd/apd<shot>_fca_field.nc`; regenerate with `python -m decorrelation.apd_check.fca_fields`).
+Default `FCAOptions`, 54 to 59 of 68 live pixels estimated per shot, 45 to 128 s per shot.
+
+| $f_\mathrm{GW}$ | shots | median $|\boldsymbol{v}|$, m/s | direction | $\ell_1$, $\ell_2$, cm | $\ell_1/\ell_2$ | tilt | confidence |
+|---|---|---|---|---|---|---|---|
+| 0.24 to 0.30 | 009, 011 | 250 to 290 | $-19^\circ$, $-63^\circ$ (scattered) | 0.6, 0.3 | 2.1 to 2.3 | $50^\circ$ | 0.63 |
+| 0.44 to 0.46 | 016, 017, 018 | 290 to 300 | $+21^\circ$ to $+23^\circ$ | 0.65, 0.34 | 2.0 to 2.1 | $52^\circ$ | 0.65 |
+| 0.65 | 022 | 430 | $+7^\circ$ | 0.85, 0.46 | 1.8 | $53^\circ$ | 0.79 |
+| 0.80 | 025, 026, 027 | 500 to 515 | $+1^\circ$ to $+5^\circ$ | 0.9, 0.48 | 1.9 | $56^\circ$ | 0.82 |
+
+- Speed, size and confidence rise with density; the aspect ratio (1.8 to 2.3) and the tilt of the long axis (50 to
+  56 degrees from radial) do not change. The repeats at $f_\mathrm{GW}$ = 0.45 and 0.80 agree among themselves.
+- The only failures are the shape fit at 1 to 5 edge pixels (one triangle) of the five low-density shots, where
+  $\ell_2$ is below the pitch; none at $f_\mathrm{GW} \geq 0.65$. No crossing-time failure anywhere.
+- Against the deck's cached fields: at $f_\mathrm{GW} \geq 0.65$ the step 8 pattern holds on every shot (FCA at 0.6 of
+  the 3TDE speed, turned 28 to 37 degrees from it, within 15 % and 10 degrees of the 2DCA tracks). Below 0.65 the FCA
+  reads 0.33 to 0.6 of the 3TDE speed and its direction agrees less with the 2DCA (30 degrees apart at 0.45), as
+  expected where $\ell_2$ is below the pitch (the conditioning limitation).
+- The two live columns nearest the separatrix carry the longest, mostly poloidal arrows, whose sign flips with
+  density (downward at low density, upward at 0.80); they are also the low-confidence ones.
+
 ## Log
 
 - 2026-11-10: plan written.
@@ -344,3 +369,7 @@ the default `FCAOptions`. Run times 78, 78 and 95 s; no warning from the crossin
 - 2026-11-10: step 6 done, results above: pooling and the triangle mean agree to 0.001 in $\boldsymbol{v}$ on case 10.
 - 2026-11-10: step 8 done, results above: on shot 1160616027 the TDE reads 1.76 times the crossing speed, and the FCA
   turns the vector to the direction of the deck's 2DCA tracks. The branch is installed in fusion_scripts' venv.
+- 2026-11-10: the `Sosnowsky/tripletail` branch (the LaTeX note `fca/note` and the manim slides `fca/presentation`)
+  merged (`b4a9f49`), its worktree removed; the note gained a Limitations bullet on the conditioning of the shape fit
+  with the spaced-antenna literature (`b612cc7`); the FCA fields of the nine density-scan shots drawn through
+  fusion_scripts (results above).

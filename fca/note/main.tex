@@ -1,0 +1,517 @@
+\documentclass[aps,pre,11pt,a4paper,preprint,amsmath,amssymb,groupedaddress]{revtex4-2}
+
+% latex packages
+\usepackage{fix-cm}
+\usepackage{bm}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, calc, decorations.pathreplacing}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% times fonts
+\usepackage{times}
+\usepackage{mathptmx}
+
+% Okabe-Ito colours
+\definecolor{oiblack}{HTML}{000000}
+\definecolor{oiorange}{HTML}{E69F00}
+\definecolor{oisky}{HTML}{56B4E9}
+\definecolor{oigreen}{HTML}{009E73}
+\definecolor{oiblue}{HTML}{0072B2}
+\definecolor{oired}{HTML}{D55E00}
+\definecolor{oipurple}{HTML}{CC79A7}
+\definecolor{muted}{HTML}{888888}
+
+\lstset{basicstyle=\ttfamily\small, columns=fullflexible, keepspaces=true, frame=single,
+        rulecolor=\color{muted}, xleftmargin=1em, xrightmargin=1em, aboveskip=1em, belowskip=1em,
+        commentstyle=\color{muted}, language=Python, upquote=true}
+
+% references; cleveref does not resolve all label types under revtex4-2
+\newcommand{\Eqref}[1]{Eq.~\eqref{#1}}
+\newcommand{\Eqsref}[2]{Eqs.~\eqref{#1} and~\eqref{#2}}
+\newcommand{\Figref}[1]{Fig.~\ref{#1}}
+\newcommand{\Tabref}[1]{Table~\ref{#1}}
+\newcommand{\Secref}[1]{Sec.~\ref{#1}}
+
+% mathematical symbols
+\newcommand{\wh}{\widehat}
+\newcommand{\ave}[1]{{\left<#1\right>}}
+\newcommand{\abs}[1]{{\left|#1\right|}}
+\newcommand{\rmd}{\text{d}}
+\newcommand{\br}{\ensuremath{\bm{x}}}
+\newcommand{\bv}{\ensuremath{\bm{v}}}
+\newcommand{\bD}{\ensuremath{\bm{\Delta}}}
+\newcommand{\bex}{\ensuremath{\hat{\bm{x}}}}
+\newcommand{\bey}{\ensuremath{\hat{\bm{y}}}}
+\newcommand{\be}{\ensuremath{\hat{\bm{e}}}}
+\newcommand{\T}{\ensuremath{\mathsf{T}}}
+
+% model symbols
+\newcommand{\rpsi}{\ensuremath{\rho_\psi}}
+\newcommand{\rphi}{\ensuremath{\rho_\varphi}}
+\newcommand{\taud}{\ensuremath{\tau_\text{p}}}
+\newcommand{\taue}{\ensuremath{\tau_\text{e}}}
+\newcommand{\Wi}{\ensuremath{W^{-1}}}
+\newcommand{\w}[1]{\ensuremath{w_{#1}}}
+\newcommand{\psh}{\ensuremath{\psi}}
+\newcommand{\tlag}{\tau}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\begin{document}
+
+\title{Velocity estimation by the crossing time and full correlation analysis:\\
+the model, the method and its implementation in \code{velocity\_estimation}}
+
+\author{J.~M.~Losada and O.~E.~Garcia}
+\affiliation{Department of Physics and Technology, UiT The Arctic University of Norway, N-9037 Troms{\o}, Norway}
+
+\date{\today}
+
+\begin{abstract}
+This note documents two velocity estimators of the \code{velocity\_estimation} package: the crossing time and full correlation analysis (FCA). Both are derived for a superposition of uncorrelated pulses that move with a common velocity, have a finite lifetime and are elongated and tilted. The crossing time compares the autocorrelation of a signal with its cross-correlation with a second one at the same lag, which removes any factor of the correlation that depends on the lag alone. FCA adds the zero-lag correlations, which give the shape and tilt of the structures, and from both it gives the velocity vector for any elongation, tilt and lifetime. We then describe how the package applies the method on an imaging grid, how it estimates the correlations from noisy signals, how to call it, and its limitations.
+\end{abstract}
+
+\maketitle
+
+%=====================================================================
+\section{Introduction}
+\label{sec:introduction}
+
+The \code{velocity\_estimation} package estimates a two-dimensional velocity field from a grid of fluctuation measurements, such as gas puff imaging or beam emission spectroscopy arrays, with a few points around each pixel~\cite{losada_three-point_2024}. This note documents two estimators of the package that use the full correlation functions of the signals rather than only the positions of their maxima.
+
+The \emph{crossing time} \taue{} is the lag at which the autocorrelation of one signal equals its cross-correlation with a second signal. Two points a distance $\Delta$ apart then give the velocity component along their separation as $\Delta/2\taue$~\cite{briggs_analysis_1950,woodman_true_1995,holloway_cross_1997}. \emph{Full correlation analysis} (FCA) measures the elongation and tilt of the structures from the correlations at zero lag between three or more points, and corrects the crossing times for them~\cite{phillips_effects_1955,briggs_analysis_1984,armstrong_analysis_1972,holloway_cross_1997a}. Both methods come from spaced-receiver measurements of ionospheric drifts.
+
+In \Secref{sec:model} we define the model, a superposition of pulses, and its cross-correlation function. In \Secref{sec:crossing} we derive the crossing time, in \Secref{sec:shape} the shape from the zero-lag correlations, and in \Secref{sec:fca} the FCA velocity. \Secref{sec:grid} describes how the package pools the pairs of pixels around each reference pixel into one fit, \Secref{sec:data} how it estimates the correlations from measured signals, \Secref{sec:usage} how to call it, and \Secref{sec:limitations} its limitations.
+
+%=====================================================================
+\section{A superposition of pulses}
+\label{sec:model}
+
+Consider a superposition of propagating pulses with a finite lifetime~\cite{pecseli_interpretation_1993,garcia_stochastic_2016},
+%
+\begin{equation}
+\label{eq:process}
+\Phi(\br,t) = \sum_{k=1}^{K} a_k\, \psh\big( \br - \bm{\xi}_k - \bv(t-s_k) \big)\, \varphi\!\left( \frac{t-s_k}{\taud} \right).
+\end{equation}
+%
+The sum runs over $K$ uncorrelated pulses, each with an amplitude $a_k$. The pulses have a spatial shape \psh{} and a temporal envelope $\varphi$, which makes each pulse grow and decay over the lifetime \taud. Pulse $k$ is at the position $\bm{\xi}_k$ at the time $s_k$, and all pulses move with the same velocity \bv{} (\Figref{fig:model}a, b).
+
+The cross-correlation function of the process at a separation \bD{} and a lag $\tlag$ is
+%
+\begin{equation}
+\label{eq:ccf_def}
+R(\bD, \tlag) = \frac{\ave{\left[ \Phi(\br, t) - \ave{\Phi} \right] \left[ \Phi(\br + \bD, t + \tlag) - \ave{\Phi} \right]}}{\ave{\left[ \Phi(\br, t) - \ave{\Phi} \right]^2}}.
+\end{equation}
+%
+It correlates the point at $\br + \bD$ at the time $t+\tlag$ with the point at \br{} at the time $t$, so that it peaks at a positive lag when the structures move from \br{} towards $\br+\bD$. Campbell's theorem~\cite{rice_mathematical_1944} gives
+%
+\begin{equation}
+\label{eq:ccf_general}
+R(\bD, \tlag) = \rpsi\big( \bD - \bv\tlag \big)\, \rphi\!\left( \frac{\tlag}{\taud} \right),
+\end{equation}
+%
+where \rpsi{} and \rphi{} are the normalized autocorrelations of the pulse shape and of its envelope,
+%
+\begin{equation}
+\rpsi(\bm{r}) = \frac{\int \psh(\br)\, \psh(\br + \bm{r})\, \rmd^2x}{\int \psh^2(\br)\, \rmd^2x},
+\qquad
+\rphi(u) = \frac{\int \varphi(\theta)\, \varphi(\theta + u)\, \rmd\theta}{\int \varphi^2(\theta)\, \rmd\theta}.
+\end{equation}
+%
+At each lag the cross-correlation is the autocorrelation of the pulse shape centred on $\bv\tlag$, and the lifetime lowers it by the factor $\rphi(\tlag/\taud)$, which depends on the lag alone (\Figref{fig:model}c). We call this factor the \emph{decorrelation}.
+
+Elongated and tilted pulses have an elliptic shape, $\rpsi(\bm{r}) = g(\bm{r}^\T \Wi \bm{r})$ with $g$ decreasing and $g(0)=1$. The symmetric, positive-definite matrix
+%
+\begin{equation}
+\label{eq:w}
+W = Q_\alpha \begin{pmatrix} \ell_1^2 & 0 \\ 0 & \ell_2^2 \end{pmatrix} Q_\alpha^\T,
+\qquad
+Q_\alpha = \begin{pmatrix} \cos\alpha & -\sin\alpha \\ \sin\alpha & \cos\alpha \end{pmatrix},
+\end{equation}
+%
+describes structures with the widths $\ell_1 \ge \ell_2$ along their principal axes, the long axis tilted by the angle $\alpha$ from the $x$ axis. Its inverse has the elements
+%
+\begin{equation}
+\label{eq:w_elements}
+\w{xx} = \frac{\cos^2\alpha}{\ell_1^2} + \frac{\sin^2\alpha}{\ell_2^2},
+\qquad
+\w{yy} = \frac{\sin^2\alpha}{\ell_1^2} + \frac{\cos^2\alpha}{\ell_2^2},
+\qquad
+\w{xy} = \left( \frac{1}{\ell_1^2} - \frac{1}{\ell_2^2} \right) \sin\alpha\cos\alpha,
+\end{equation}
+%
+where we write $\w{ij}$ for $(\Wi)_{ij}$. The off-diagonal element vanishes for round pulses and for pulses aligned with the axes. For Gaussian pulses with a Gaussian envelope, $\psh(\br) \propto \exp(-\br^\T\Wi\br)$ and $\varphi(\theta) \propto e^{-\theta^2}$, the cross-correlation is
+%
+\begin{equation}
+\label{eq:ccf_gauss}
+R(\bD, \tlag) = \exp\!\left( - \frac{\tlag^2}{2\taud^2} \right) \exp\!\left[ -\frac{1}{2}(\bD - \bv\tlag)^\T \Wi (\bD - \bv\tlag) \right],
+\end{equation}
+%
+so that $W$ is the covariance of the autocorrelation of the pulse shape. The aim is to estimate \bv{} from $R$ at the handful of separations available around each pixel.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[>=Stealth, font=\small]
+  % (a) one pulse
+  \begin{scope}
+    \node at (-1.9, 2.0) {(a)};
+    \draw[muted, dashed] (-1.7, 0) -- (1.9, 0);
+    \fill[oiblue, fill opacity=0.15, rotate=30] (0,0) ellipse (1.5 and 0.6);
+    \draw[oiblue, thick, rotate=30] (0,0) ellipse (1.5 and 0.6);
+    \draw[thick, rotate=30] (0,0) -- (1.5,0) node[midway, above left=-1pt] {$\ell_1$};
+    \draw[thick, rotate=30] (0,0) -- (0,0.6) node[midway, left=1pt] {$\ell_2$};
+    \draw (0.75,0) arc (0:30:0.75); \node at (0.98, 0.22) {$\alpha$};
+    \draw[->, very thick, oiorange] (0,0) -- (1.6, -0.9) node[below] {$\bv$};
+    \fill (0,0) circle (1.2pt);
+    \draw[->] (-1.6,-1.5) -- (-1.0,-1.5) node[right] {$x$};
+    \draw[->] (-1.6,-1.5) -- (-1.6,-0.9) node[above] {$y$};
+  \end{scope}
+  % (b) superposition on a grid of points
+  \begin{scope}[xshift=5.3cm]
+    \node at (-2.3, 2.0) {(b)};
+    \draw[muted] (-2.0,-1.6) rectangle (2.0,1.6);
+    \foreach \x/\y/\o in {-1.3/0.9/0.25, 0.5/1.0/0.1, -0.4/-0.6/0.3, 1.2/-0.9/0.18, 1.4/0.3/0.06}{
+      \fill[oiblue, fill opacity=\o, rotate around={30:(\x,\y)}] (\x,\y) ellipse (0.75 and 0.3);
+      \draw[->, oiorange, thick] (\x,\y) -- ++(0.55,-0.31);
+    }
+    \foreach \i in {-1.5,-0.5,0.5,1.5}{\foreach \j in {-1.05,-0.35,0.35,1.05}{\fill (\i,\j) circle (1.3pt);}}
+    \node[below] at (0,-1.6) {$\Phi(\br,t)$ sampled on a grid};
+  \end{scope}
+  % (c) the cross-correlation in the plane of separations
+  \begin{scope}[xshift=10.6cm]
+    \node at (-1.9, 2.0) {(c)};
+    \draw[->, muted] (-1.6,0) -- (2.4,0) node[right, black] {$\Delta_x$};
+    \draw[->, muted] (0,-1.6) -- (0,1.6) node[above, black] {$\Delta_y$};
+    \draw[oiorange, dashed] (-0.4,0.23) -- (2.3,-1.33);
+    \foreach \s/\o/\lab in {0/0.35/0, 0.9/0.2/{\tau_1}, 1.8/0.08/{\tau_2}}{
+      \fill[oiblue, fill opacity=\o, rotate around={30:(\s,-0.577*\s)}] (\s,-0.577*\s) ellipse (0.9 and 0.36);
+      \fill (\s,-0.577*\s) circle (1.0pt);
+    }
+    \node[above] at (0.0,0.38) {$\tau=0$};
+    \node[above right] at (0.95,-0.3) {$\tau_1$};
+    \node[above right] at (1.85,-0.82) {$\tau_2$};
+    \node[oiorange, below left] at (1.3,-0.8) {$\bv\tau$};
+  \end{scope}
+\end{tikzpicture}
+\caption{(a) An elliptic pulse with the widths $\ell_1$ and $\ell_2$, its long axis tilted by $\alpha$ from the $x$ axis, moving with the velocity \bv. (b) The process: pulses of the same shape and velocity, with amplitudes and lifetimes that make them fade in and out (shading), measured on a grid of points. (c) The cross-correlation $R(\bD,\tlag)$ of \Eqref{eq:ccf_general} in the plane of separations: at each lag it is the autocorrelation of the pulse shape centred on $\bv\tlag$, lowered by the decorrelation $\rphi(\tlag/\taud)$ (shading).}
+\label{fig:model}
+\end{figure}
+
+%=====================================================================
+\section{The crossing time}
+\label{sec:crossing}
+
+Take two points a separation \bD{} apart. The crossing time \taue{} is the lag at which the autocorrelation equals the cross-correlation,
+%
+\begin{equation}
+\label{eq:crossing_def}
+R(\bm{0}, \taue) = R(\bD, \taue).
+\end{equation}
+%
+Both sides of \Eqref{eq:crossing_def} carry the same decorrelation $\rphi(\taue/\taud)$, which cancels (\Figref{fig:crossing}a). With an elliptic shape what remains is $g\big((\bv\taue)^\T\Wi\bv\taue\big) = g\big((\bD-\bv\taue)^\T\Wi(\bD-\bv\taue)\big)$, and since $g$ is decreasing the two quadratic forms are equal. Expanding them gives the \emph{crossing equation},
+%
+\begin{equation}
+\label{eq:crossing}
+\bD^\T \Wi \bv = \frac{\bD^\T \Wi \bD}{2\taue}.
+\end{equation}
+%
+It is linear in \bv{} and holds for any envelope and any elliptic shape. Geometrically, at the crossing time the centre $\bv\taue$ of the correlation is equally far from the two points in the metric of \Wi: it lies on the line through $\bD/2$ normal to $\Wi\bD$, and the contour of $R$ through one point passes through the other (\Figref{fig:crossing}b, c). If $\bD^\T\Wi\bv = 0$ the centre never reaches that line and there is no crossing; \Eqref{eq:crossing} then holds with $1/\taue = 0$.
+
+For round pulses, $W = \ell^2 I$, and with $\bD = \Delta\be$ the crossing equation gives the velocity component along the separation,
+%
+\begin{equation}
+\label{eq:crossing_round}
+\wh{v}_\text{e} = \frac{\Delta}{2\taue} = \be\cdot\bv,
+\end{equation}
+%
+exactly, for any lifetime, any direction of motion and any separation. This is the estimator of the method \code{CROSSING} (\Secref{sec:usage}), which computes \Eqref{eq:crossing_round} for each pair. For elongated and tilted pulses, \Eqref{eq:crossing} gives instead
+%
+\begin{equation}
+\label{eq:crossing_barber}
+\frac{\Delta}{2\taue} = \frac{\be^\T\Wi\bv}{\be^\T\Wi\be},
+\end{equation}
+%
+which differs from $\be\cdot\bv$ unless \be{} is a principal axis of $W$. Pulses moving along $x$, for example, give a finite crossing time between two points separated along $y$, and so an apparent velocity $v\,\w{xy}/\w{yy}$ along $y$ (\Figref{fig:crossing}c). FCA removes this by measuring \Wi.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[>=Stealth, font=\small]
+  % (a) the correlations against the lag
+  \begin{axis}[name=ccf, width=5.4cm, height=4.6cm, xmin=-0.5, xmax=2, ymin=0, ymax=1.2,
+      xlabel={$\tau v/\Delta$}, ylabel={$R$}, xtick={0,0.5,1,1.5,2}, ytick={0,0.5,1},
+      tick label style={font=\footnotesize}, label style={font=\small}, clip=false]
+    \node at (rel axis cs:-0.25,1.0) {(a)};
+    \addplot[oiblack, thick, domain=-0.5:2, samples=120, mark=o, mark repeat=15, mark size=1.5pt]
+      {exp(-x^2/2)};
+    \addplot[oiblue, thick, domain=-0.5:2, samples=120, mark=square, mark repeat=15, mark size=1.5pt]
+      {exp(-(1-x)^2/2)};
+    \addplot[oiblack, thick, dashed, domain=-0.5:2, samples=120] {exp(-x^2/(2*0.6^2))*exp(-x^2/2)};
+    \addplot[oiblue, thick, dashed, domain=-0.5:2, samples=120] {exp(-x^2/(2*0.6^2))*exp(-(1-x)^2/2)};
+    \draw[oigreen, dotted, thick] (axis cs:0.5,0) -- (axis cs:0.5,1.0);
+    \node[oigreen, above] at (axis cs:0.5,1.0) {$\taue$};
+    \node[oiblack] at (axis cs:1.6,0.5) {$R(\bm 0,\tau)$};
+    \node[oiblue] at (axis cs:1.5,1.1) {$R(\bD,\tau)$};
+  \end{axis}
+  % (b) round pulses: the bisector
+  \begin{scope}[xshift=5.6cm, yshift=0.9cm]
+    \node at (-0.6, 2.6) {(b)};
+    \draw[muted, dashed] (1,-0.5) -- (1,2.6);
+    \draw[oiblue, thick] (1,0.839) circle (1.305);
+    \draw[oiorange, dashed] (-0.25,-0.21) -- (2.0,1.678);
+    \draw[->, oiorange, very thick] (0,0) -- (1,0.839) node[above left=-1pt] {$\bv\taue$};
+    \fill[oiblue] (1,0.839) circle (1.3pt);
+    \fill (0,0) circle (1.6pt) node[below left] {$P_0$};
+    \fill (2,0) circle (1.6pt) node[below right] {$P_1$};
+    \draw[thin] (0,0) -- (2,0);
+    \draw[muted, thin] (0,0) -- (0,-0.65) (1,-0.5) -- (1,-0.65);
+    \draw[<->, thin] (0,-0.6) -- (1,-0.6) node[midway, below] {$\Delta/2$};
+  \end{scope}
+  % (c) elongated tilted pulses moving along x, points along y
+  \begin{scope}[xshift=9.8cm, yshift=1.2cm]
+    \node at (-1.3, 2.3) {(c)};
+    \draw[muted, dotted, thick] (-0.8,0.8) -- (2.0,0.8);
+    \draw[muted, dashed] (-1.0,1.8) -- (1.6,-0.8);
+    \draw[oiblue, thick, rotate around={120:(0.799,0)}] (0.799,0) ellipse (1.806 and 0.71);
+    \draw[oiorange, dashed] (-0.8,0) -- (2.0,0);
+    \draw[->, oiorange, very thick] (0,0) -- (0.799,0) node[below right=-2pt] {$\bv\taue$};
+    \fill[oiblue] (0.799,0) circle (1.3pt);
+    \fill (0,0) circle (1.6pt) node[below left] {$P_0$};
+    \fill (0,1.6) circle (1.6pt) node[above left] {$P_1$};
+  \end{scope}
+\end{tikzpicture}
+\caption{The crossing time. (a) The autocorrelation (black, circles) and the cross-correlation at $\bD = \Delta\bv/v$ (blue, squares) of round pulses, frozen (solid) and with $\taud = 0.6\,\Delta/v$ (dashed): the decorrelation lowers both but they still cross at $\taue = \Delta/2v$. (b) Round pulses moving obliquely to the separation: at \taue{} the centre of the correlation lies on the perpendicular bisector of the two points (grey dashed), so that its projection on the separation is $\Delta/2$; the contour of $R$ through $P_0$ passes through $P_1$ (blue). (c) Elongated pulses, $\alpha = 120^\circ$, moving along $x$, with the points separated along $y$: the centre never reaches the perpendicular bisector (grey dotted), but it reaches the bisector in the metric of \Wi{} (grey dashed), which gives a crossing time and an apparent velocity along $y$.}
+\label{fig:crossing}
+\end{figure}
+
+%=====================================================================
+\section{The shape from the zero-lag correlations}
+\label{sec:shape}
+
+At zero lag the decorrelation is $\rphi(0) = 1$, and for Gaussian pulses \Eqref{eq:ccf_gauss} gives
+%
+\begin{equation}
+\label{eq:shape}
+-2\ln R(\bD, 0) = \bD^\T \Wi \bD = \Delta_x^2\, \w{xx} + 2\Delta_x\Delta_y\, \w{xy} + \Delta_y^2\, \w{yy},
+\end{equation}
+%
+one equation, linear in the three elements of \Wi, for each pair of points. Each pair gives the distance, along its separation, from the centre to a contour of $R(\bD,0)$; three separations that are not all parallel fix the ellipse (\Figref{fig:shape}a). For three points at $\bm{0}$, $\Delta\bex$ and $\Delta\bey$, the separations $\Delta\bex$, $\Delta\bey$ and $\Delta(\bey-\bex)$ give
+%
+\begin{equation}
+\label{eq:shape_triangle}
+\begin{aligned}
+\w{xx} &= -\frac{2\ln R(\Delta\bex, 0)}{\Delta^2},
+\qquad
+\w{yy} = -\frac{2\ln R(\Delta\bey, 0)}{\Delta^2},
+\\
+\w{xy} &= \frac{\ln R(\Delta(\bey - \bex), 0) - \ln R(\Delta\bex, 0) - \ln R(\Delta\bey, 0)}{\Delta^2}.
+\end{aligned}
+\end{equation}
+%
+With more pairs, \Eqref{eq:shape} is solved by least squares (\Secref{sec:grid}).
+
+The widths and the tilt follow from the eigenvalues and eigenvectors of \Wi,
+%
+\begin{equation}
+\label{eq:shape_parameters}
+\frac{1}{\ell_{1,2}^2} = \frac{\w{xx} + \w{yy}}{2} \mp \sqrt{\left(\frac{\w{xx} - \w{yy}}{2}\right)^2 + \w{xy}^2},
+\qquad
+\alpha = \frac{1}{2}\operatorname{atan2}\!\big(-2\w{xy},\ \w{yy} - \w{xx}\big),
+\end{equation}
+%
+with $\ell_1 \ge \ell_2$ and $\alpha$ in $(-\pi/2, \pi/2]$, the angle of the long axis from the $x$ axis. A measured \Wi{} that is not positive definite has no widths; the package then gives no estimate.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[>=Stealth, font=\small]
+  % (a) three directions fix the ellipse
+  \begin{scope}
+    \node at (-2.8, 2.4) {(a)};
+    \draw[->, muted] (-2.6,0) -- (2.6,0) node[right, black] {$\Delta_x$};
+    \draw[->, muted] (0,-2.2) -- (0,2.3) node[above, black] {$\Delta_y$};
+    \draw[muted, dashed] (-2.0,2.0) -- (2.0,-2.0);
+    \fill[oiblue, fill opacity=0.12, rotate=120] (0,0) ellipse (2.52 and 0.99);
+    \draw[oiblue, thick, rotate=120] (0,0) ellipse (2.52 and 0.99);
+    \foreach \x/\y in {1.114/0, 0/1.636, -1.525/1.525}{
+      \fill[oiorange] (\x,\y) circle (2.2pt); \fill[oiorange] (-\x,-\y) circle (2.2pt);
+    }
+    \node[below right] at (1.114,0) {$\Delta\bex$};
+    \node[right] at (0,1.75) {$\Delta\bey$};
+    \node[left] at (-1.65,1.6) {$\Delta(\bey-\bex)$};
+    \node[oiblue, right] at (1.2,1.1) {$\bD^\T\Wi\bD = \kappa$};
+  \end{scope}
+  % (b) pooled pairs around a reference pixel
+  \begin{scope}[xshift=7.6cm]
+    \node at (-2.6, 2.4) {(b)};
+    \foreach \i in {-1.5,0,1.5}{\foreach \j in {-1.5,0,1.5}{\fill[muted] (\i,\j) circle (1.4pt);}}
+    \draw[oiblue, thick, dashed] (-1.5,0) -- (0,1.5) -- (1.5,0) -- (0,-1.5) -- cycle;
+    \draw[oiorange, very thick] (-1.5,0) -- (1.5,0);
+    \draw[oiorange, very thick] (0,-1.5) -- (0,1.5);
+    \fill (0,0) circle (2.4pt) node[below right] {$P_0$};
+    \foreach \x/\y/\lab/\pos in {-1.5/0/{H_-}/left, 1.5/0/{H_+}/right, 0/1.5/{V_+}/above, 0/-1.5/{V_-}/below}{
+      \fill (\x,\y) circle (2.4pt) node[\pos] {$\lab$};
+    }
+    \draw[oiorange, very thick] (1.6,-2.25) -- (2.1,-2.25) node[right, black] {shape and velocity};
+    \draw[oiblue, thick, dashed] (1.6,-2.65) -- (2.1,-2.65) node[right, black] {shape};
+  \end{scope}
+\end{tikzpicture}
+\caption{(a) The zero-lag correlation at each separation gives, by \Eqref{eq:shape}, the distance from the centre to the contour $\bD^\T\Wi\bD = \kappa$ along that separation (orange dots); three directions, here those of a triangle of points, fix the ellipse. (b) The pairs that the package pools around a reference pixel $P_0$ with its horizontal ($H_\pm$) and vertical ($V_\pm$) neighbours: the four pairs with $P_0$ (orange, solid) enter both the shape and the velocity, and the four diagonal pairs of a horizontal with a vertical neighbour (blue, dashed) enter only the shape.}
+\label{fig:shape}
+\end{figure}
+
+%=====================================================================
+\section{Full correlation analysis}
+\label{sec:fca}
+
+FCA solves the crossing equations~\eqref{eq:crossing} with the measured \Wi. Two separations $\bD_1$ and $\bD_2$ that are not parallel give two linear equations for the two components of \bv,
+%
+\begin{equation}
+\label{eq:fca_system}
+\begin{pmatrix} \bD_1^\T\Wi \\ \bD_2^\T\Wi \end{pmatrix} \bv
+=
+\begin{pmatrix} \bD_1^\T\Wi\bD_1 / 2\tau_{\text{e},1} \\ \bD_2^\T\Wi\bD_2 / 2\tau_{\text{e},2} \end{pmatrix}.
+\end{equation}
+%
+For the triangle of \Secref{sec:shape}, with the crossing times $\tau_{\text{e},x}$ and $\tau_{\text{e},y}$ of the pairs separated by $\Delta\bex$ and $\Delta\bey$, the solution is
+%
+\begin{equation}
+\label{eq:fca}
+\wh{\bv}_\text{FCA} = W \begin{pmatrix} \w{xx}\, \Delta/2\tau_{\text{e},x} \\ \w{yy}\, \Delta/2\tau_{\text{e},y} \end{pmatrix} = \bv,
+\end{equation}
+%
+exactly, for Gaussian pulses of any elongation, tilt and lifetime, at any separation. The crossing times remove the decorrelation, and the zero-lag shape turns their components back from the metric of \Wi{} to that of the plane. With $\Wi = I$, \Eqref{eq:fca_system} reduces to the crossing time of \Eqref{eq:crossing_round} for each pair. \Tabref{tab:methods} summarizes the two estimators.
+
+\begin{table}
+\caption{The two estimators. Both need one crossing time per pair of the reference pixel with a neighbour; FCA also needs the zero-lag correlations.}
+\label{tab:methods}
+\begin{ruledtabular}
+\begin{tabular}{lp{0.3\textwidth}p{0.22\textwidth}p{0.25\textwidth}}
+Method & Solves & Gives & Holds for \\
+\colrule
+\code{CROSSING} & \Eqref{eq:crossing} with $\Wi = I$, from \taue{} per pair & $\be\cdot\bv$ per pair, \Eqref{eq:crossing_round} & round pulses, any lifetime \\
+\code{FCA} & \Eqref{eq:shape} from $R(\bD,0)$, then \Eqref{eq:crossing} from \taue{} per pair & \bv, $\ell_1$, $\ell_2$, $\alpha$ & Gaussian pulses of any elongation, tilt and lifetime \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+%=====================================================================
+\section{On the imaging grid: one pooled fit per pixel}
+\label{sec:grid}
+
+For each reference pixel $P_0$ the package selects its horizontal neighbours $H_\pm$ and vertical neighbours $V_\pm$, with the same rules as for the other estimators (\code{NeighbourOptions}). Instead of solving one triangle at a time, it collects all the available pairs and solves once (\Figref{fig:shape}b):
+%
+\begin{itemize}
+\item \emph{Shape.} One equation~\eqref{eq:shape} for each pair of $P_0$ with a neighbour, and for each pair of a horizontal with a vertical neighbour: up to eight equations for the three unknowns $\bm{w} = (\w{xx}, \w{xy}, \w{yy})$. Writing them as $A\bm{w} = \bm{b}$, with the rows $(\Delta_x^2, 2\Delta_x\Delta_y, \Delta_y^2)$ of $A$ and $b = -2\ln R(\bD, 0)$, the estimate is the least-squares solution $\wh{\bm{w}} = (A^\T A)^{-1}A^\T\bm{b}$. Pairs of two horizontal or two vertical neighbours, at twice the separation, are left out, since for non-Gaussian pulses $-2\ln R$ there measures a different curvature. Pairs with $R(\bD,0)$ below a minimum (\code{minimum\_correlation}) are also left out.
+\item \emph{Velocity.} One crossing equation~\eqref{eq:crossing} for each pair of $P_0$ with a neighbour: up to four equations $M\bv = \bm{c}$ for two unknowns, with the rows $\bD_k^\T\wh{W}^{-1}$ of $M$ and $c_k = \bD_k^\T\wh{W}^{-1}\bD_k/2\tau_{\text{e},k}$. The estimate is the least-squares solution $\wh{\bv} = (M^\T M)^{-1}M^\T\bm{c}$. The method \code{CROSSING} solves the same system with $\wh{W}^{-1} = I$.
+\end{itemize}
+%
+With both diagonals the off-diagonal element comes from two correlations, $\w{xy} = [\ln R(\Delta\bex - \Delta\bey, 0) - \ln R(\Delta\bex + \Delta\bey, 0)]/2\Delta^2$, rather than from three. Opposite neighbours keep the estimate centred on the reference pixel. At a boundary or corner pixel, with a single triangle, the same code solves an exactly determined system. Separations of any length and direction, as on a tilted grid or with \code{max\_separation} above one, need nothing special. Both directions are required: with only horizontal or only vertical neighbours there is no estimate.
+
+%=====================================================================
+\section{The correlations from measured signals}
+\label{sec:data}
+
+\Figref{fig:data} shows the two steps that turn measured signals into the inputs of \Secref{sec:grid}.
+
+\emph{Normalization without the noise spike.} White measurement noise adds a spike at zero lag to the autocovariance $C(\tlag)$ of each pixel, and to no cross-covariance. Normalizing by the measured variance $C(0)$ would then lower every $R(\bD,0)$ by the factor $1 + \sigma_\text{n}^2/C(0)$, with $\sigma_\text{n}^2$ the noise variance, add a constant to every $-2\ln R$ and bias \Wi; unequal noise at two pixels would also shift their crossing. The package therefore replaces each variance by the autocovariance extrapolated to zero lag from the two smallest nonzero lags. Near zero lag a smooth autocovariance is $C(\tlag) \approx C(0) - a\tlag^2$, and the values at $\rmd t$ and $2\,\rmd t$ give
+%
+\begin{equation}
+\label{eq:spike_free}
+C^*(0) = \frac{4C(\rmd t) - C(2\,\rmd t)}{3}
+\end{equation}
+%
+(\Figref{fig:data}a). Every correlation is then normalized as $R_{ab}(\tlag) = C_{ab}(\tlag)/\sqrt{C^*_{aa}(0)\,C^*_{bb}(0)}$. This is on by default (\code{remove\_noise\_spike}) and needs a sampling time well below the correlation time.
+
+\emph{Sign convention.} For the pair of the pixel $P_0$ at $\br_0$ and $P_1$ at $\br_1$, $\bD = \br_1 - \br_0$ and $R(\bD,\tlag)$ correlates $P_1$ at $t + \tlag$ with $P_0$ at $t$, so that it peaks at a positive lag when the structures move from $P_0$ to $P_1$.
+
+\emph{The autocorrelation.} The crossing compares $R(\bD,\tlag)$ with the mean of the two pixels' autocorrelations, $\bar{R}(\tlag) = [R_{00}(\tlag) + R_{11}(\tlag)]/2$. In the model the two are equal. With the mean, swapping the two pixels only changes the sign of \taue, so that a reversed pair is reused from the cache as $R_{10}(\tlag) = R_{01}(-\tlag)$, and an inhomogeneous field, such as the radial profile of the scrape-off layer, does not favour one end of the pair.
+
+\emph{The crossing.} The package looks for the first sign change of $\bar{R}(\tlag) - R(\bD,\tlag)$ on each side of zero lag, within the lag window $[-T, T]$ (\code{window}), refines it on a cubic spline through the samples, and keeps the one nearest zero (\Figref{fig:data}b). Where there is no crossing within the window it takes $1/\taue = 0$, which is the exact value when $\bD^\T\Wi\bv = 0$ (\Secref{sec:crossing}) and otherwise makes an error of at most $\Delta/2T$ in that component. A spurious crossing in the noisy tails lies far from zero lag and also gives a small component.
+
+\emph{Checks and outputs.} A pixel gets no estimate, with a warning, when its separations do not span the plane, when any $R(\bD,0) \le 0$ among the pairs used, or when the fitted \Wi{} is not positive definite. The confidence of an estimate is the smallest maximum of the cross-correlations of the reference pixel with its neighbours. FCA also returns $\ell_1$, $\ell_2$ and $\alpha$ from \Eqref{eq:shape_parameters}.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[font=\small]
+  % (a) the noise spike and the extrapolation
+  \begin{axis}[name=spike, width=7.2cm, height=4.8cm, xmin=-0.05, xmax=1.05, ymin=0.2, ymax=1.5,
+      xlabel={$\tau$}, ylabel={$C(\tau)$}, xtick={0,0.2,0.4,0.6,0.8,1.0},
+      xticklabels={$0$,$\rmd t$,$2\,\rmd t$,,,}, ytick={0.5,1}, tick label style={font=\footnotesize},
+      clip=false]
+    \node at (rel axis cs:-0.16,1.06) {(a)};
+    \addplot[muted, thin, domain=0:1, samples=80] {exp(-x^2/(2*0.6^2))};
+    \addplot[oiblack, only marks, mark=*, mark size=1.8pt] coordinates
+      {(0.2,0.9460) (0.4,0.8007) (0.6,0.6065) (0.8,0.4111) (1.0,0.2494)};
+    \addplot[oired, only marks, mark=triangle*, mark size=2.6pt] coordinates {(0,1.4)};
+    \addplot[oigreen, thick, dashed, domain=0:0.45, samples=40] {0.99430 - (0.9460-0.8007)/(3*0.04)*x^2};
+    \addplot[oigreen, only marks, mark=diamond*, mark size=2.8pt] coordinates {(0,0.9943)};
+    \node[oired, right] at (axis cs:0.03,1.4) {$C(0)$, with the noise};
+    \node[oigreen, right] at (axis cs:0.06,1.07) {$C^*(0)$, \Eqref{eq:spike_free}};
+  \end{axis}
+  % (b) the sampled crossing
+  \begin{axis}[at={(spike.east)}, anchor=west, xshift=1.6cm, width=7.2cm, height=4.8cm,
+      xmin=-1.2, xmax=2.0, ymin=0, ymax=1.08, xlabel={$\tau$}, ylabel={$R$},
+      xtick={-1,0,1,2}, ytick={0,0.5,1}, tick label style={font=\footnotesize}, clip=false]
+    \node at (rel axis cs:-0.16,1.06) {(b)};
+    \addplot[oiblack, thin, domain=-1.2:2, samples=100] {exp(-x^2/(2*1.2^2))*exp(-x^2/2)};
+    \addplot[oiblue, thin, domain=-1.2:2, samples=100] {exp(-x^2/(2*1.2^2))*exp(-(1-x)^2/2)};
+    \addplot[oiblack, only marks, mark=o, mark size=1.8pt, domain=-1.2:2, samples=17]
+      {exp(-x^2/(2*1.2^2))*exp(-x^2/2)};
+    \addplot[oiblue, only marks, mark=square, mark size=1.8pt, domain=-1.2:2, samples=17]
+      {exp(-x^2/(2*1.2^2))*exp(-(1-x)^2/2)};
+    \draw[oigreen, dotted, thick] (axis cs:0.5,0) -- (axis cs:0.5,0.84);
+    \node[oigreen, right] at (axis cs:0.5,0.1) {$\taue$};
+    \node[oiblack, right] at (axis cs:-1.15,0.85) {$\bar{R}(\tau)$};
+    \node[oiblue] at (axis cs:1.5,0.97) {$R(\bD,\tau)$};
+  \end{axis}
+\end{tikzpicture}
+\caption{(a) The autocovariance of a pixel, sampled at multiples of $\rmd t$ (black): white noise raises the zero-lag value (red triangle), and \Eqref{eq:spike_free} extrapolates the samples at $\rmd t$ and $2\,\rmd t$ back to zero lag (green dashed line and diamond); the grey line is the noise-free autocovariance. (b) The sampled crossing: the mean autocorrelation (black, circles) and the cross-correlation (blue, squares) are compared on each side of zero lag, and the sign change of their difference, refined on a spline (thin lines), gives \taue; here there is none at negative lags.}
+\label{fig:data}
+\end{figure}
+
+%=====================================================================
+\section{Usage}
+\label{sec:usage}
+
+The estimator is chosen with the option \code{velocity\_method} of \code{EstimationOptions}, whose default stays time-delay estimation. The crossing time and FCA take their options from \code{FCAOptions}:
+%
+\begin{lstlisting}
+import velocity_estimation.two_dim_velocity_estimates as tdve
+from velocity_estimation import utils
+
+eo = tdve.EstimationOptions(
+    velocity_method=tdve.VelocityMethod.FCA)
+eo.fca_options.window = None   # lag window; None: 100 dt
+eo.fca_options.remove_noise_spike = True
+eo.fca_options.minimum_correlation = 0.1
+
+data = utils.CModImagingDataInterface(ds)
+movie_data = tdve.estimate_velocity_field(data, eo)
+vx, vy = movie_data.get_vx(), movie_data.get_vy()
+l1, l2 = movie_data.get_l1(), movie_data.get_l2()
+tilt = movie_data.get_tilt()
+\end{lstlisting}
+%
+\code{VelocityMethod.CROSSING} gives the crossing-time velocity of \Eqref{eq:crossing_round} pooled over the pairs, and leaves $\ell_1$, $\ell_2$ and the tilt as NaN. For both methods the options of time-delay estimation (\code{method}, \code{cc\_options}, \code{use\_3point\_method}) are ignored. The tilt is in radians, measured from the first coordinate of the grid.
+
+%=====================================================================
+\section{Limitations}
+\label{sec:limitations}
+
+\begin{itemize}
+\item \Eqref{eq:shape} holds for Gaussian pulses. For other shapes $-2\ln R(\bD,0)$ is not quadratic in \bD, and the fitted \Wi{} depends on the separations used. The crossing equation~\eqref{eq:crossing} holds for any elliptic shape.
+\item The noise correction removes white noise only. Coherent pickup and cross-talk between neighbouring channels raise $R(\bD,0)$ and the cross-correlations, and are not corrected.
+\item The model has one velocity. With a spread of velocities, of covariance $\Sigma_V$, the shape of the correlation broadens with the lag, $W(\tlag) = W + \Sigma_V\tlag^2$, which the zero-lag shape does not contain.
+\item The extrapolation of \Eqref{eq:spike_free} needs a sampling time well below the correlation time.
+\end{itemize}
+
+\begin{acknowledgments}
+This work was supported by the Tromsø Research Foundation through the Trond Mohn Research Foundation's UiT initiative, FUSENOW (TMF2025UiT01).
+\end{acknowledgments}
+
+\bibliography{bibliography}
+
+\end{document}

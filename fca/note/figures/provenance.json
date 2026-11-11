@@ -1,0 +1,124 @@
+{
+  "about": "Written by the figure_provenance package (https://github.com/Sosnowsky/figure-provenance) each time a figure in this folder is saved, one entry per file. 'producer' is the function that drew it, a path inside the git repository 'repo' (remote 'remote') at 'commit'; 'uncommitted' lists the files that differed from that commit when it ran, other than this file and the figures it records. 'call' gives its arguments, 'called_from' the line that called it, 'command' what was run, from 'cwd'. 'purpose' is the producer's docstring. To change a figure, edit the producer and its docstring and rerun it: an edit to the file itself is lost on the next run.",
+  "figures": {
+    "scan_angle.pdf": {
+      "producer": "fca/scans/figures.py:fig_angle",
+      "call": "fig_angle()",
+      "called_from": "fca/scans/figures.py:297 (main)",
+      "command": "venv/bin/python -m fca.scans.figures",
+      "cwd": ".",
+      "date": "2026-11-11T08:39:10",
+      "repo": "velocity-estimation",
+      "remote": "git@github.com:uit-cosmo/velocity-estimation.git",
+      "commit": "39ee631e552ee9e38c527fc5122f912876ba51e1",
+      "uncommitted": [
+        "HANDOUT_FCA.md",
+        "fca/note/bibliography.bib",
+        "fca/note/main.tex"
+      ],
+      "purpose": "Misalignment: round frozen pulses, against the angle of their velocity from x. Panels and\nsymbols as in fig_lifetime. The two-point delay along x gives v_x / cos^2(beta); the other\nestimates have no bias in the model. The crossing time and the FCA scatter and fall short in\nthe component across the motion where one pair has no crossing (beta = 0) or a late one\n(beta = 15 and 75 degrees), in the tails of the correlation functions."
+    },
+    "scan_aspect.pdf": {
+      "producer": "fca/scans/figures.py:fig_aspect",
+      "call": "fig_aspect()",
+      "called_from": "fca/scans/figures.py:297 (main)",
+      "command": "venv/bin/python -m fca.scans.figures",
+      "cwd": ".",
+      "date": "2026-11-11T08:39:12",
+      "repo": "velocity-estimation",
+      "remote": "git@github.com:uit-cosmo/velocity-estimation.git",
+      "commit": "39ee631e552ee9e38c527fc5122f912876ba51e1",
+      "uncommitted": [
+        "HANDOUT_FCA.md",
+        "fca/note/bibliography.bib",
+        "fca/note/main.tex"
+      ],
+      "purpose": "Barber pole against the elongation: frozen pulses moving along x with their long axis 30\ndegrees from x, against the aspect ratio. Panels and symbols as in fig_lifetime. The pair\nalong x has no bias for a frozen pattern moving along it; the 3TDE and the crossing time turn\ntowards the short axis."
+    },
+    "scan_ensemble.pdf": {
+      "producer": "fca/scans/figures.py:fig_ensemble",
+      "call": "fig_ensemble()",
+      "called_from": "fca/scans/figures.py:297 (main)",
+      "command": "venv/bin/python -m fca.scans.figures",
+      "cwd": ".",
+      "date": "2026-11-11T08:39:34",
+      "repo": "velocity-estimation",
+      "remote": "git@github.com:uit-cosmo/velocity-estimation.git",
+      "commit": "39ee631e552ee9e38c527fc5122f912876ba51e1",
+      "uncommitted": [
+        "HANDOUT_FCA.md",
+        "fca/note/bibliography.bib",
+        "fca/note/main.tex"
+      ],
+      "purpose": "Every parameter drawn at random (fca.scans.run.ensemble_cases), one record per case: the\nfraction of cases with an error below the abscissa. (a) The component along x from two points,\n|v_x estimate - v_x| / |v|; (b) the vector from three points, |v estimate - v| / |v|. Thick\nlines with markers: the realizations; thin lines: the estimators on the model correlation\nfunction, the bias alone. Cumulative distributions on a logarithmic abscissa so that errors\nfrom a hundredth of the speed to several times it show together."
+    },
+    "scan_lifetime.pdf": {
+      "producer": "fca/scans/figures.py:fig_lifetime",
+      "call": "fig_lifetime()",
+      "called_from": "fca/scans/figures.py:297 (main)",
+      "command": "venv/bin/python -m fca.scans.figures",
+      "cwd": ".",
+      "date": "2026-11-11T08:39:09",
+      "repo": "velocity-estimation",
+      "remote": "git@github.com:uit-cosmo/velocity-estimation.git",
+      "commit": "39ee631e552ee9e38c527fc5122f912876ba51e1",
+      "uncommitted": [
+        "HANDOUT_FCA.md",
+        "fca/note/bibliography.bib",
+        "fca/note/main.tex"
+      ],
+      "purpose": "Decorrelation: round pulses moving along x, against their lifetime (the frozen pattern at the\nright end). (a) The two-point estimates of the pair along x, (b) the speed and (c) the direction\nof the three-point estimates, as ratios to and angles from the true velocity. Markers: mean\nand standard deviation over eight records; lines: the model. Logarithmic ordinates in (a)\nand (b), where the time delays overestimate by up to a factor of five."
+    },
+    "scan_spacing.pdf": {
+      "producer": "fca/scans/figures.py:fig_spacing",
+      "call": "fig_spacing()",
+      "called_from": "fca/scans/figures.py:297 (main)",
+      "command": "venv/bin/python -m fca.scans.figures",
+      "cwd": ".",
+      "date": "2026-11-11T08:39:20",
+      "repo": "velocity-estimation",
+      "remote": "git@github.com:uit-cosmo/velocity-estimation.git",
+      "commit": "39ee631e552ee9e38c527fc5122f912876ba51e1",
+      "uncommitted": [
+        "HANDOUT_FCA.md",
+        "fca/note/bibliography.bib",
+        "fca/note/main.tex"
+      ],
+      "purpose": "The pixel separation: pulses of aspect ratio 2 tilted by 30 degrees, with the lifetime 2,\nmoving along x, against the separation over the pulse size. Panels and symbols as in\nfig_lifetime. The biases of the time delays and of the crossing time do not depend on the\nseparation; the scatter of the FCA grows at small separations, and at the largest one the\nshape fit fails (no marker)."
+    },
+    "scan_spread.pdf": {
+      "producer": "fca/scans/figures.py:fig_spread",
+      "call": "fig_spread()",
+      "called_from": "fca/scans/figures.py:297 (main)",
+      "command": "venv/bin/python -m fca.scans.figures",
+      "cwd": ".",
+      "date": "2026-11-11T08:39:18",
+      "repo": "velocity-estimation",
+      "remote": "git@github.com:uit-cosmo/velocity-estimation.git",
+      "commit": "39ee631e552ee9e38c527fc5122f912876ba51e1",
+      "uncommitted": [
+        "HANDOUT_FCA.md",
+        "fca/note/bibliography.bib",
+        "fca/note/main.tex"
+      ],
+      "purpose": "A spread of velocities, which none of the estimators models: pulses with the lifetime\nSPREAD_LIFETIME moving along x on average, against the standard deviation of each velocity\ncomponent, for round pulses (top row) and for pulses of aspect ratio 2 tilted by 30 degrees\n(bottom row). Panels and symbols as in fig_lifetime; the lines are the estimators on the model\ncorrelation with the lag-dependent shape W + sigma^2 tau^2."
+    },
+    "scan_tilt.pdf": {
+      "producer": "fca/scans/figures.py:fig_tilt",
+      "call": "fig_tilt()",
+      "called_from": "fca/scans/figures.py:297 (main)",
+      "command": "venv/bin/python -m fca.scans.figures",
+      "cwd": ".",
+      "date": "2026-11-11T08:39:16",
+      "repo": "velocity-estimation",
+      "remote": "git@github.com:uit-cosmo/velocity-estimation.git",
+      "commit": "39ee631e552ee9e38c527fc5122f912876ba51e1",
+      "uncommitted": [
+        "HANDOUT_FCA.md",
+        "fca/note/bibliography.bib",
+        "fca/note/main.tex"
+      ],
+      "purpose": "Barber pole against the tilt: frozen pulses moving along x, against the angle of their long\naxis from x, at the aspect ratios 2 (top row) and 4 (bottom row). Panels and symbols as in\nfig_lifetime. One row per aspect ratio so that each panel holds the methods only."
+    }
+  }
+}

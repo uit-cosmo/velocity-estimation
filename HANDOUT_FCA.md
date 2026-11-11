@@ -1,6 +1,6 @@
 # Crossing time and full correlation analysis: handout
 
-State as of 2026-11-10, branch `fca` at `b4b653c`: twelve commits on `main` (`b3b6945`), not pushed. This file says what
+State as of 2026-11-11, branch `fca`, on `main` (`b3b6945`), pushed to `origin/fca`. This file says what
 the branch adds to velocity_estimation, why it took this shape, what it gave on synthetic and C-Mod data, where the
 code, tests, documents and figures are, and what is left. The decisions and the full result tables are in
 `PLAN_FCA.md`; the derivations are in the note `fca/note/main.tex`; the package docs in `docs/` are the user-facing
@@ -153,6 +153,39 @@ fusion_scripts' `fca_fields.py`, nine shots at the default options, 54 to 59 of 
   anywhere. The two live columns nearest the separatrix carry the longest, mostly poloidal, low-confidence arrows,
   whose sign flips with density.
 
+### The four estimators on realizations (2026-11-10)
+
+`fca/scans`: blobmodel realizations of the note's pulse model on 3 x 3 pixels, estimated at the centre pixel with
+2TDE, 3TDE, the crossing time and FCA; 640 records of 4000 $\ell/v$, run on the fusion server (about an hour on 8
+cores). Units $\ell = \sqrt{\ell_1\ell_2} = 1$, $\lvert\boldsymbol v\rvert = 1$. Scans of one property from a base case
+(round frozen pulses along $x$, $\Delta = \ell$), eight records per case, and 240 cases with every property at random.
+The note's section "The estimators on realizations" has the seven figures and the table.
+
+- In every scan the realizations follow each estimator applied to the model correlation function
+  (`fca.scans.model.expected`): the errors are biases, not noise.
+- **Lifetime**: 2TDE and 3TDE overestimate by $1 + \ell^2/v^2\tau_\mathrm{p}^2$ (5 at $\tau_\mathrm{p} = \ell/2v$);
+  crossing time and FCA within 0.01 at every lifetime.
+- **Direction**: 2TDE gives $v_x/\cos^2\beta$; the three-point estimates have no bias in the model.
+- **Elongation and tilt** (frozen, motion along $x$): 3TDE turns towards the short axis (to $-60^\circ$ at aspect 4)
+  with a lower speed; the crossing-time vector turns the same way with a higher speed; FCA within 0.01 to 0.05.
+- **Velocity spread** ($\tau_\mathrm{p} = 5$, normal isotropic spread $\sigma_v$): the model correlation has the
+  lag-dependent shape $W + \sigma_v^2\tau^2$ and the crossing equation holds with the shape at the crossing lag. Round
+  pulses: crossing time and FCA exact up to $\sigma_v = 0.5v$, TDE at 1.5. Aspect 2, tilt $30^\circ$: FCA within 0.05
+  up to $\sigma_v = 0.3v$, then 1.2 in speed with a scatter of 0.1 to 0.2. A spread needs a finite lifetime in the
+  generator, so that the pulses are uniform in space and time whatever their velocity.
+- **Separation** ($\tau_\mathrm{p} = 2$, aspect 2, tilt $30^\circ$): the biases do not depend on it; FCA scatters at
+  $\Delta = 1.4\ell$ and gives no estimate at $2\ell$ (pairs below `minimum_correlation`).
+- **Random cases**, error over the speed, median and ninth decile: 2TDE ($x$) 1.13, 7.2; crossing time ($x$) 0.19,
+  0.62; 3TDE 0.47, 0.80; crossing-time vector 0.41, 0.82; FCA 0.027, 0.27, with no estimate in 6 of 240 cases, all at
+  $\Delta \approx 1.4\ell$ to $1.5\ell$.
+- **Scatter across the motion** (new, corrects the note's earlier "small component"): a pair across the motion has no
+  crossing, and `crossing_time` takes a noise-induced sign change in the tails (lag 2.4 to 3.5 $\ell/v$, correlation
+  noise about 0.02) as one. The crossing-time and FCA component along that pair scatters by 0.1 to 0.3 $v$ with a mean
+  near zero (about $\pm 10^\circ$), against 0.01 to 0.04 for the 3TDE. A pair nearly across the motion ($\beta =
+  15^\circ$, $75^\circ$; long axis near a pixel axis; $\Delta > \ell$) has its crossing where the correlations have
+  decayed, and the component falls short and scatters. The package was not changed.
+- Settings that differ from the defaults: lag window 8, `CCOptions(minimum_cc_value=0, interpolate=True)`.
+
 ## Where things are
 
 | Path | What |
@@ -163,7 +196,8 @@ fusion_scripts' `fca_fields.py`, nine shots at the default options, 54 to 59 of 
 | `tests/full_correlation_analysis_test.py`, `estimation_options_test.py`, `fca_realizations_test.py` | The new tests. `two_dim_velocity_estimates_test.py` keeps the old ones on the ported generator. |
 | `docs/index.rst`, `usage.rst`, `estimation_options.rst`, `README.md` | The biases and the two estimators, choosing the method, the shape getters and the width convention, the option tables, the limitations, the references. |
 | `PLAN_FCA.md` | The plan: decisions, the full result tables (steps 5, 6, 8 and the scan) and the log. |
-| `fca/note/main.tex`, `bibliography.bib` | The note. `fca/presentation/slides.py` and `README.md`: the manim slides and how to render them. |
+| `fca/scans/model.py`, `run.py`, `figures.py`, `results/<scan>.json` | The scans of realizations: the case and its model correlation with what each estimator gives on it; the generator and the scans; the figures `fca/note/figures/scan_<name>.pdf` with their `provenance.json`; one row per realization. |
+| `fca/note/main.tex`, `bibliography.bib` | The note, with the time-delay section and the realizations. `fca/presentation/slides.py` and `README.md`: the manim slides and how to render them. |
 | fusion_scripts `decorrelation/apd_check/fca_fields.py` | `compute(shot)`, cached in `decorrelation/cache/apd/apd<shot>_fca_field.nc` (vr, vz, confidence, l1, l2, tilt, dead); `summary`, `table`, `fig_field`, `fig_overview`, `main`. Commit `3f97362` on `main`. |
 | fusion_scripts `decorrelation/apd_check/figures/fca_field_<shot>.pdf`, `fca_fields_overview.pdf` | The nine fields and the 3 x 3 overview, with their `provenance.json` entries. |
 | fusion_scripts `decorrelation/apd_check/fields.py`, `twodca_manuscript/tde_field.py` | The preprocessed APD records (`fields.load(shot)`, `fields.DEAD`, `fields.SHOTS`), the deck's TDE settings and its cached 2DCA tracks. |
@@ -179,6 +213,9 @@ venv/bin/pip install -e '.[test]'                        # blobmodel>=2.1.0 and 
 venv/bin/python -m pytest tests -q -p no:cacheprovider   # 201 tests, about 55 s
 venv/bin/python -m sphinx -b html docs <out>             # the docs; the autosummary warning about lumache predates the branch
 cd fca/note && latexmk -pdf main                         # the note
+venv/bin/python -m fca.scans.run --workers 8 [scan ...]  # the scans; skips those with a results file unless --force
+venv/bin/python -m fca.scans.figures [name ...]          # their figures; needs cosmoplots and figure_provenance in the venv
+# on fusion (ssh -x fusion): ~/velocity-estimation-fca with its own venv, numpy 1.26 since blobmodel fails on numpy 2
 cd fca/presentation && .venv/bin/manim-slides render --quality=h slides.py <scenes>   # the slides, see its README
 
 # fusion_scripts, from its root; its venv installs velocity_estimation from site-packages, not editable
@@ -264,7 +301,7 @@ came from Crossref and OpenAlex).
 
 ## What is left
 
-1. Push `fca`, merge into `main` and release 1.1.0 (PyPI has 1.0.0; readthedocs reads `docs/requirements.txt`, which
+1. Merge `fca` into `main` and release 1.1.0 (PyPI has 1.0.0; readthedocs reads `docs/requirements.txt`, which
    now asks for `blobmodel>=2.1.0`).
 2. On C-Mod: `max_separation = 2` for the conditioning of the shape fit, above all below $f_\mathrm{GW} = 0.65$; the
    2DCA comparison at low density; the sign flip of the poloidal arrows next to the separatrix.
@@ -276,3 +313,6 @@ came from Crossref and OpenAlex).
    the FCA gave "half" the 3TDE speed on shot 027, where the measured ratio is 0.63; regenerating the figures clears the
    `uncommitted` list of their provenance.
 6. `test_cond_av` stays marginal, as before the branch.
+7. The scatter across the motion: to decide whether `crossing_time` should accept a crossing only where the
+   correlation exceeds a floor (for instance 0.1). It removes the scatter and biases the component by up to
+   $\Delta/2\tau_\mathrm{e}$ for motion nearly across a pair; to be tested on new realizations before any change.

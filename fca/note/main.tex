@@ -4,6 +4,7 @@
 \usepackage{fix-cm}
 \usepackage{bm}
 \usepackage{graphicx}
+\graphicspath{{figures/}}
 \usepackage{xcolor}
 \usepackage{booktabs}
 \usepackage{listings}
@@ -34,6 +35,7 @@
 \newcommand{\Eqref}[1]{Eq.~\eqref{#1}}
 \newcommand{\Eqsref}[2]{Eqs.~\eqref{#1} and~\eqref{#2}}
 \newcommand{\Figref}[1]{Fig.~\ref{#1}}
+\newcommand{\Figsref}[2]{Figs.~\ref{#1} and~\ref{#2}}
 \newcommand{\Tabref}[1]{Table~\ref{#1}}
 \newcommand{\Secref}[1]{Sec.~\ref{#1}}
 
@@ -55,6 +57,7 @@
 \newcommand{\rphi}{\ensuremath{\rho_\varphi}}
 \newcommand{\taud}{\ensuremath{\tau_\text{p}}}
 \newcommand{\taue}{\ensuremath{\tau_\text{e}}}
+\newcommand{\taumax}{\ensuremath{\tau_\text{max}}}
 \newcommand{\Wi}{\ensuremath{W^{-1}}}
 \newcommand{\w}[1]{\ensuremath{w_{#1}}}
 \newcommand{\psh}{\ensuremath{\psi}}
@@ -63,8 +66,8 @@
 
 \begin{document}
 
-\title{Velocity estimation by the crossing time and full correlation analysis:\\
-the model, the method and its implementation in \code{velocity\_estimation}}
+\title{Velocity estimation by time delays, the crossing time and full correlation analysis:\\
+the model, the methods, their errors on realizations and their implementation in \code{velocity\_estimation}}
 
 \author{J.~M.~Losada and O.~E.~Garcia}
 \affiliation{Department of Physics and Technology, UiT The Arctic University of Norway, N-9037 Troms{\o}, Norway}
@@ -72,7 +75,7 @@ the model, the method and its implementation in \code{velocity\_estimation}}
 \date{\today}
 
 \begin{abstract}
-This note documents two velocity estimators of the \code{velocity\_estimation} package: the crossing time and full correlation analysis (FCA). Both are derived for a superposition of uncorrelated pulses that move with a common velocity, have a finite lifetime and are elongated and tilted. The crossing time compares the autocorrelation of a signal with its cross-correlation with a second one at the same lag, which removes any factor of the correlation that depends on the lag alone. FCA adds the zero-lag correlations, which give the shape and tilt of the structures, and from both it gives the velocity vector for any elongation, tilt and lifetime. We then describe how the package applies the method on an imaging grid, how it estimates the correlations from noisy signals, how to call it, and its limitations.
+This note documents the velocity estimators of the \code{velocity\_estimation} package: time-delay estimation from two and from three points, the crossing time and full correlation analysis (FCA). All are derived for a superposition of uncorrelated pulses that move with a common velocity, have a finite lifetime and are elongated and tilted. The time delays are biased by motion oblique to the separation of the points, by the lifetime and by the tilt of the pulses. The crossing time compares the autocorrelation of a signal with its cross-correlation with a second one at the same lag, which removes any factor of the correlation that depends on the lag alone. FCA adds the zero-lag correlations, which give the shape and tilt of the structures, and from both it gives the velocity vector for any elongation, tilt and lifetime. We describe how the package applies the methods on an imaging grid, how it estimates the correlations from noisy signals and how to call it. Realizations of the process, scanned over the lifetime, the direction of motion, the elongation, the tilt, a spread of velocities and the pixel separation, show the bias and the scatter of each method.
 \end{abstract}
 
 \maketitle
@@ -81,11 +84,11 @@ This note documents two velocity estimators of the \code{velocity\_estimation} p
 \section{Introduction}
 \label{sec:introduction}
 
-The \code{velocity\_estimation} package estimates a two-dimensional velocity field from a grid of fluctuation measurements, such as gas puff imaging or beam emission spectroscopy arrays, with a few points around each pixel~\cite{losada_three-point_2024}. This note documents two estimators of the package that use the full correlation functions of the signals rather than only the positions of their maxima.
+The \code{velocity\_estimation} package estimates a two-dimensional velocity field from a grid of fluctuation measurements, such as gas puff imaging or beam emission spectroscopy arrays, with a few points around each pixel~\cite{losada_three-point_2024}. Its default estimator is time-delay estimation (TDE), which uses the lags that maximize the cross-correlations between the points. This note documents it together with two estimators that use the full correlation functions rather than only the positions of their maxima, and compares them on realizations of a model process.
 
-The \emph{crossing time} \taue{} is the lag at which the autocorrelation of one signal equals its cross-correlation with a second signal. Two points a distance $\Delta$ apart then give the velocity component along their separation as $\Delta/2\taue$~\cite{briggs_analysis_1950,woodman_true_1995,holloway_cross_1997}. \emph{Full correlation analysis} (FCA) measures the elongation and tilt of the structures from the correlations at zero lag between three or more points, and corrects the crossing times for them~\cite{phillips_effects_1955,briggs_analysis_1984,armstrong_analysis_1972,holloway_cross_1997a}. Both methods come from spaced-receiver measurements of ionospheric drifts.
+\emph{Two-point time-delay estimation} (2TDE) divides the distance between two points by the lag that maximizes the cross-correlation of their signals. \emph{Three-point time-delay estimation} (3TDE) combines the delays of two pairs that share a point and are not parallel into a velocity vector~\cite{losada_three-point_2024}. The \emph{crossing time} \taue{} is the lag at which the autocorrelation of one signal equals its cross-correlation with a second signal. Two points a distance $\Delta$ apart then give the velocity component along their separation as $\Delta/2\taue$~\cite{briggs_analysis_1950,woodman_true_1995,holloway_cross_1997}. \emph{Full correlation analysis} (FCA) measures the elongation and tilt of the structures from the correlations at zero lag between three or more points, and corrects the crossing times for them~\cite{phillips_effects_1955,briggs_analysis_1984,armstrong_analysis_1972,holloway_cross_1997a}. Both methods come from spaced-receiver measurements of ionospheric drifts.
 
-In \Secref{sec:model} we define the model, a superposition of pulses, and its cross-correlation function. In \Secref{sec:crossing} we derive the crossing time, in \Secref{sec:shape} the shape from the zero-lag correlations, and in \Secref{sec:fca} the FCA velocity. \Secref{sec:grid} describes how the package pools the pairs of pixels around each reference pixel into one fit, \Secref{sec:data} how it estimates the correlations from measured signals, \Secref{sec:usage} how to call it, and \Secref{sec:limitations} its limitations.
+In \Secref{sec:model} we define the model, a superposition of pulses, and its cross-correlation function. In \Secref{sec:tde} we derive what the time delays give for it, in \Secref{sec:crossing} the crossing time, in \Secref{sec:shape} the shape from the zero-lag correlations, and in \Secref{sec:fca} the FCA velocity. \Secref{sec:grid} describes how the package applies the estimators around each reference pixel, and \Secref{sec:data} how it estimates the correlations from measured signals. In \Secref{sec:realizations} we compare the four estimators on realizations of the process. \Secref{sec:usage} shows how to call them, and \Secref{sec:limitations} lists the limitations.
 
 %=====================================================================
 \section{A superposition of pulses}
@@ -200,6 +203,68 @@ so that $W$ is the covariance of the autocorrelation of the pulse shape. The aim
 \caption{(a) An elliptic pulse with the widths $\ell_1$ and $\ell_2$, its long axis tilted by $\alpha$ from the $x$ axis, moving with the velocity \bv. (b) The process: pulses of the same shape and velocity, with amplitudes and lifetimes that make them fade in and out (shading), measured on a grid of points. (c) The cross-correlation $R(\bD,\tlag)$ of \Eqref{eq:ccf_general} in the plane of separations: at each lag it is the autocorrelation of the pulse shape centred on $\bv\tlag$, lowered by the decorrelation $\rphi(\tlag/\taud)$ (shading).}
 \label{fig:model}
 \end{figure}
+
+%=====================================================================
+\section{Time-delay estimation}
+\label{sec:tde}
+
+Time-delay estimation uses the lag \taumax{} that maximizes the cross-correlation at a fixed separation. For the Gaussian pulses of \Eqref{eq:ccf_gauss} the logarithm of $R$ is quadratic in the lag, and its maximum is at
+%
+\begin{equation}
+\label{eq:delay}
+\taumax(\bD) = \frac{\bD^\T\Wi\bv}{\bv^\T\Wi\bv + 1/\taud^2}.
+\end{equation}
+%
+The delay is linear in the separation. Its denominator holds the two reasons for the cross-correlation to fall with the lag: the pattern moves away, and it decays.
+
+\emph{Two points.} For two points separated by $\bD = \Delta\be$, the 2TDE estimates the velocity component along the separation, $v_\shortparallel = \be\cdot\bv$, as
+%
+\begin{equation}
+\label{eq:2tde}
+\wh{v}_\text{2TDE} = \frac{\Delta}{\taumax} = \frac{\bv^\T\Wi\bv + 1/\taud^2}{\be^\T\Wi\bv}.
+\end{equation}
+%
+\emph{Three points.} For a reference point with one point at $\Delta\bex$ and another at $\Delta\bey$, with the delays $\tau_x$ and $\tau_y$, the 3TDE inverts the delays as for a frozen pattern of round pulses, for which $\taumax = \bD\cdot\bv/\abs{\bv}^2$~\cite{losada_three-point_2024},
+%
+\begin{equation}
+\label{eq:3tde}
+\wh{\bv}_\text{3TDE} = \frac{\Delta\,(\tau_x, \tau_y)}{\tau_x^2 + \tau_y^2} = \frac{\bv^\T\Wi\bv + 1/\taud^2}{\abs{\Wi\bv}^2}\, \Wi\bv,
+\end{equation}
+%
+where the second equality follows from \Eqref{eq:delay}. Neither estimate depends on the separation $\Delta$. \Eqsref{eq:2tde}{eq:3tde} contain three biases, which we separate by switching on one property of the pulses at a time.
+
+\emph{Misalignment.} For a frozen pattern of round pulses, $\taud = \infty$ and $W = \ell^2 I$, the two estimates are
+%
+\begin{equation}
+\label{eq:misalignment}
+\wh{v}_\text{2TDE} = \frac{\abs{\bv}^2}{\be\cdot\bv} = \frac{v_\shortparallel}{\cos^2\beta},
+\qquad
+\wh{\bv}_\text{3TDE} = \bv,
+\end{equation}
+%
+with $\beta$ the angle between \bv{} and the separation. The 2TDE gives the component along the separation only when the pulses move along it, and it diverges for motion across it. The third point removes this bias.
+
+\emph{Decorrelation.} For round pulses with a finite lifetime,
+%
+\begin{equation}
+\label{eq:decorrelation}
+\wh{v}_\text{2TDE} = \frac{v_\shortparallel}{\cos^2\beta} \left( 1 + \frac{\ell^2}{\abs{\bv}^2\taud^2} \right),
+\qquad
+\wh{\bv}_\text{3TDE} = \bv \left( 1 + \frac{\ell^2}{\abs{\bv}^2\taud^2} \right).
+\end{equation}
+%
+The decorrelation pulls the maximum of the cross-correlation towards shorter lags, so that both estimates are too high, by a factor that is close to one only when a pulse moves much farther than its size within its lifetime, $\abs{\bv}\taud \gg \ell$. The 3TDE keeps the direction. Any factor of the cross-correlation that falls with the lag alone acts in the same way.
+
+\emph{Barber pole.} For a frozen pattern of elongated pulses,
+%
+\begin{equation}
+\label{eq:barberpole}
+\wh{v}_\text{2TDE} = \frac{\bv^\T\Wi\bv}{\be^\T\Wi\bv},
+\qquad
+\wh{\bv}_\text{3TDE} = \frac{\bv^\T\Wi\bv}{\abs{\Wi\bv}^2}\, \Wi\bv.
+\end{equation}
+%
+The 3TDE gives the projection of \bv{} on the direction of $\Wi\bv$, the normal to the contour of the pulse autocorrelation through $\bv$: the estimate is too short and is turned towards the short axis of the pulses, unless \bv{} lies along one of their axes. For pulses moving along $x$, $\bv = v\bex$, the 2TDE of the pair along $x$ gives $v$, and that of the pair along $y$ gives an apparent velocity $v\,\w{xx}/\w{xy}$ across the motion.
 
 %=====================================================================
 \section{The crossing time}
@@ -382,26 +447,28 @@ For the triangle of \Secref{sec:shape}, with the crossing times $\tau_{\text{e},
 \wh{\bv}_\text{FCA} = W \begin{pmatrix} \w{xx}\, \Delta/2\tau_{\text{e},x} \\ \w{yy}\, \Delta/2\tau_{\text{e},y} \end{pmatrix} = \bv,
 \end{equation}
 %
-exactly, for Gaussian pulses of any elongation, tilt and lifetime, at any separation. The crossing times remove the decorrelation, and the zero-lag shape turns their components back from the metric of \Wi{} to that of the plane. With $\Wi = I$, \Eqref{eq:fca_system} reduces to the crossing time of \Eqref{eq:crossing_round} for each pair. \Tabref{tab:methods} summarizes the two estimators.
+exactly, for Gaussian pulses of any elongation, tilt and lifetime, at any separation. The crossing times remove the decorrelation, and the zero-lag shape turns their components back from the metric of \Wi{} to that of the plane. With $\Wi = I$, \Eqref{eq:fca_system} reduces to the crossing time of \Eqref{eq:crossing_round} for each pair. \Tabref{tab:methods} summarizes the four estimators.
 
 \begin{table}
-\caption{The two estimators. Both need one crossing time per pair of the reference pixel with a neighbour; FCA also needs the zero-lag correlations.}
+\caption{The four estimators. The time delays need the lag of the maximum of each cross-correlation, the crossing time and FCA the lag at which it meets the autocorrelation; FCA also needs the zero-lag correlations.}
 \label{tab:methods}
 \begin{ruledtabular}
-\begin{tabular}{lp{0.3\textwidth}p{0.22\textwidth}p{0.25\textwidth}}
-Method & Solves & Gives & Holds for \\
+\begin{tabular}{lp{0.29\textwidth}p{0.2\textwidth}p{0.3\textwidth}}
+Method & Uses & Gives & Holds for \\
 \colrule
-\code{CROSSING} & \Eqref{eq:crossing} with $\Wi = I$, from \taue{} per pair & $\be\cdot\bv$ per pair, \Eqref{eq:crossing_round} & round pulses, any lifetime \\
-\code{FCA} & \Eqref{eq:shape} from $R(\bD,0)$, then \Eqref{eq:crossing} from \taue{} per pair & \bv, $\ell_1$, $\ell_2$, $\alpha$ & Gaussian pulses of any elongation, tilt and lifetime \\
+2TDE & \taumax{} of one pair, \Eqref{eq:delay} & $\Delta/\taumax$, \Eqref{eq:2tde} & a frozen pattern moving along the separation \\
+3TDE & \taumax{} of two pairs that are not parallel & \bv, \Eqref{eq:3tde} & a frozen pattern of round pulses, any direction of motion \\
+\code{CROSSING} & \taue{} per pair, \Eqref{eq:crossing} with $\Wi = I$ & $\be\cdot\bv$ per pair, \Eqref{eq:crossing_round} & round pulses, any lifetime and direction of motion \\
+\code{FCA} & $R(\bD,0)$ for \Eqref{eq:shape}, then \taue{} per pair for \Eqref{eq:crossing} & \bv, $\ell_1$, $\ell_2$, $\alpha$ & Gaussian pulses of any elongation, tilt, lifetime and direction of motion \\
 \end{tabular}
 \end{ruledtabular}
 \end{table}
 
 %=====================================================================
-\section{On the imaging grid: one pooled fit per pixel}
+\section{On the imaging grid}
 \label{sec:grid}
 
-For each reference pixel $P_0$ the package selects its horizontal neighbours $H_\pm$ and vertical neighbours $V_\pm$, with the same rules as for the other estimators (\code{NeighbourOptions}). Instead of solving one triangle at a time, it collects all the available pairs and solves once (\Figref{fig:shape}b):
+For each reference pixel $P_0$ the package selects its horizontal neighbours $H_\pm$ and vertical neighbours $V_\pm$ (\code{NeighbourOptions}). The time-delay estimates are computed for each of the up to four triangles of $P_0$ with one horizontal and one vertical neighbour, and averaged: the 3TDE from the general form of \Eqref{eq:3tde} for any two separations~\cite{losada_three-point_2024}, and the two-point estimates as the separation over the delay of the horizontal pair for the first component and of the vertical pair for the second. For the crossing time and FCA the package instead collects all the available pairs and solves once (\Figref{fig:shape}b):
 %
 \begin{itemize}
 \item \emph{Shape.} One equation~\eqref{eq:shape} for each pair of $P_0$ with a neighbour, and for each pair of a horizontal with a vertical neighbour: up to eight equations for the three unknowns $\bm{w} = (\w{xx}, \w{xy}, \w{yy})$. Writing them as $A\bm{w} = \bm{b}$, with the rows $(\Delta_x^2, 2\Delta_x\Delta_y, \Delta_y^2)$ of $A$ and $b = -2\ln R(\bD, 0)$, the estimate is the least-squares solution $\wh{\bm{w}} = (A^\T A)^{-1}A^\T\bm{b}$. Pairs of two horizontal or two vertical neighbours, at twice the separation, are left out, since for non-Gaussian pulses $-2\ln R$ there measures a different curvature. Pairs with $R(\bD,0)$ below a minimum (\code{minimum\_correlation}) are also left out.
@@ -429,7 +496,7 @@ C^*(0) = \frac{4C(\rmd t) - C(2\,\rmd t)}{3}
 
 \emph{The autocorrelation.} The crossing compares $R(\bD,\tlag)$ with the mean of the two pixels' autocorrelations, $\bar{R}(\tlag) = [R_{00}(\tlag) + R_{11}(\tlag)]/2$. In the model the two are equal. With the mean, swapping the two pixels only changes the sign of \taue, so that a reversed pair is reused from the cache as $R_{10}(\tlag) = R_{01}(-\tlag)$, and an inhomogeneous field, such as the radial profile of the scrape-off layer, does not favour one end of the pair.
 
-\emph{The crossing.} The package looks for the first sign change of $\bar{R}(\tlag) - R(\bD,\tlag)$ on each side of zero lag, within the lag window $[-T, T]$ (\code{window}), refines it on a cubic spline through the samples, and keeps the one nearest zero (\Figref{fig:data}b). Where there is no crossing within the window it takes $1/\taue = 0$, which is the exact value when $\bD^\T\Wi\bv = 0$ (\Secref{sec:crossing}) and otherwise makes an error of at most $\Delta/2T$ in that component. A spurious crossing in the noisy tails lies far from zero lag and also gives a small component.
+\emph{The crossing.} The package looks for the first sign change of $\bar{R}(\tlag) - R(\bD,\tlag)$ on each side of zero lag, within the lag window $[-T, T]$ (\code{window}), refines it on a cubic spline through the samples, and keeps the one nearest zero (\Figref{fig:data}b). Where there is no crossing within the window it takes $1/\taue = 0$, which is the exact value when $\bD^\T\Wi\bv = 0$ (\Secref{sec:crossing}) and otherwise makes an error of at most $\Delta/2T$ in that component. In a record of finite length the difference also changes sign in the tails, where both functions are below their statistical error. The package takes such a sign change as a crossing, at a lag of a few correlation times, and it gives a component of either sign that is small but not negligible against the velocity (\Secref{sec:realizations}).
 
 \emph{Checks and outputs.} A pixel gets no estimate, with a warning, when its separations do not span the plane, when any $R(\bD,0) \le 0$ among the pairs used, or when the fitted \Wi{} is not positive definite. The confidence of an estimate is the smallest maximum of the cross-correlations of the reference pixel with its neighbours. FCA also returns $\ell_1$, $\ell_2$ and $\alpha$ from \Eqref{eq:shape_parameters}.
 
@@ -473,6 +540,134 @@ C^*(0) = \frac{4C(\rmd t) - C(2\,\rmd t)}{3}
 \end{figure}
 
 %=====================================================================
+\section{The estimators on realizations}
+\label{sec:realizations}
+
+We generate realizations of the process of \Eqref{eq:process} with the \code{blobmodel} package~\cite{losada_blobmodel_2025} and estimate the velocity with the four methods as the package applies them (\Secref{sec:grid}). The pulses are Gaussian with a Gaussian envelope and equal amplitudes, and are recorded on $3\times3$ pixels a distance $\Delta$ apart; the velocity is estimated at the centre pixel. Lengths are given in units of the pulse size $\ell = \sqrt{\ell_1\ell_2}$ and times in units of $\ell/v$, with $v = \abs{\bv}$. Each record lasts $4000\,\ell/v$, sampled every $0.02\,\ell/v$, and all methods use lags up to $8\,\ell/v$. The time delays are the maxima of the cross-correlations on a spline through the samples.
+
+\Tabref{tab:scans} lists the scans. Each varies one property of a base case: a frozen pattern of round pulses that move along $x$, on pixels one pulse size apart. Every case is generated eight times. In the figures the markers give the mean over the eight records and the bars their standard deviation: the distance of a marker from the grey line of no error is the bias of the method, and the bar is the scatter of a single record. The lines give each estimator applied to the model cross-correlation function, \Eqsref{eq:2tde}{eq:3tde} for the time delays and \Eqsref{eq:crossing_barber}{eq:fca} for the crossing time and FCA. Each figure has three panels. Panel (a) shows the two-point estimates of the pair along $x$, the 2TDE and the crossing time, divided by $v_x$. Panels (b) and (c) show the speed and the direction of the three-point estimates: the 3TDE, the crossing times of the pairs along $x$ and $y$ taken as a vector, and FCA.
+
+\begin{table}
+\caption{The scans of realizations. Properties that are not listed are those of the base case: a frozen pattern ($\taud = \infty$) of round pulses moving along $x$ ($\beta = 0$) with a single velocity, and $\Delta = \ell$.}
+\label{tab:scans}
+\begin{ruledtabular}
+\begin{tabular}{llll}
+Scan & Varied & Other properties & Figure \\
+\colrule
+Lifetime & $\taud v/\ell$ from $1/2$ to $16$, and $\infty$ & & \ref{fig:scan_lifetime} \\
+Direction of motion & $\beta$ from $0$ to $75^\circ$ & & \ref{fig:scan_angle} \\
+Elongation & $\ell_1/\ell_2$ from $1$ to $4$ & $\alpha = 30^\circ$ & \ref{fig:scan_aspect} \\
+Tilt & $\alpha$ from $0$ to $90^\circ$ & $\ell_1/\ell_2 = 2$ and $4$ & \ref{fig:scan_tilt} \\
+Velocity spread & $\sigma_v/v$ from $0$ to $1/2$ & $\taud = 5\ell/v$; round, and $\ell_1/\ell_2 = 2$, $\alpha = 30^\circ$ & \ref{fig:scan_spread} \\
+Separation & $\Delta/\ell$ from $0.35$ to $2$ & $\taud = 2\ell/v$, $\ell_1/\ell_2 = 2$, $\alpha = 30^\circ$ & \ref{fig:scan_spacing} \\
+Random & all of the above & & \ref{fig:scan_ensemble} \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+\subsection{Lifetime}
+
+\Figref{fig:scan_lifetime} shows the scan of the lifetime. The time delays overestimate the velocity by the factor of \Eqref{eq:decorrelation}, which grows as the pulses live shorter than the time they take to move their own size. The crossing time and FCA give the speed at every lifetime, since the envelope multiplies the auto- and the cross-correlation alike and drops out of \Eqref{eq:crossing}.
+
+The direction of the crossing time and of FCA scatters more than that of the 3TDE (\Figref{fig:scan_lifetime}c). The pair along $y$ lies across the motion, and its cross-correlation does not cross the autocorrelation. In a record of finite length the difference of the two functions changes sign in the tails, where both are below their statistical error, and the package takes that sign change as a crossing. It gives a component across the motion of either sign, with a mean close to zero. The time delay of the same pair is the maximum of a cross-correlation that peaks at zero lag, and scatters less.
+
+\begin{figure}
+\centering
+\includegraphics{scan_lifetime}
+\caption{Round pulses moving along $x$, against their lifetime; the frozen pattern is at the right end. (a) Two-point estimates of the pair along $x$, (b) speed and (c) direction of the three-point estimates. Markers: mean and standard deviation over eight records. Lines: the estimators on the model correlation function. Grey: no error.}
+\label{fig:scan_lifetime}
+\end{figure}
+
+\subsection{Direction of motion}
+
+When the velocity makes the angle $\beta$ with the pair, the 2TDE gives the speed of the pattern along the pair, \Eqref{eq:misalignment}, which grows without bound as $\beta$ approaches a right angle (\Figref{fig:scan_angle}a). The crossing time of one pair gives the component $v_x$ for round pulses. The three-point estimates have no bias in the model. In the realizations the crossing time and FCA fall short and scatter in the smaller component at the directions nearest an axis (\Figref{fig:scan_angle}c): the crossing of the pair across the motion lies at a long lag, where the correlations have decayed, and it is found late or not at all.
+
+\begin{figure}
+\centering
+\includegraphics{scan_angle}
+\caption{Round frozen pulses, against the angle $\beta$ of their velocity from $x$. Panels and symbols as in \Figref{fig:scan_lifetime}.}
+\label{fig:scan_angle}
+\end{figure}
+
+\subsection{Elongation and tilt}
+
+\Figsref{fig:scan_aspect}{fig:scan_tilt} show frozen elongated pulses that move along $x$. The pair along $x$ is aligned with the motion, and both two-point estimates give $v_x$. The 3TDE turns towards the short axis of the pulses and gives a lower speed, \Eqref{eq:barberpole}; the error grows with the elongation and is largest at a tilt below $45^\circ$. The crossing-time vector turns the same way, by less at small tilts and by more at large ones, and gives a higher speed, \Eqref{eq:crossing_barber}. FCA gives the velocity at every elongation and tilt. Its scatter is larger where the long axis lies close to a pixel axis, for the reason given for \Figref{fig:scan_lifetime}c.
+
+\begin{figure}
+\centering
+\includegraphics{scan_aspect}
+\caption{Frozen pulses moving along $x$ with the long axis at $\alpha = 30^\circ$, against their aspect ratio. Panels and symbols as in \Figref{fig:scan_lifetime}.}
+\label{fig:scan_aspect}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics{scan_tilt}
+\caption{Frozen pulses moving along $x$, against the tilt $\alpha$ of their long axis, for $\ell_1/\ell_2 = 2$ (top) and $4$ (bottom). Panels and symbols as in \Figref{fig:scan_lifetime}.}
+\label{fig:scan_tilt}
+\end{figure}
+
+\subsection{A spread of velocities}
+
+None of the estimators models a spread of velocities. Let the velocity of each pulse be normally distributed with mean \bv{} and covariance $\Sigma_V$, independent of where and when the pulse appears. Averaging \Eqref{eq:ccf_gauss} over the velocities gives
+%
+\begin{equation}
+R(\bD,\tlag) = \rho(\tlag)\sqrt{\frac{\det W}{\det W(\tlag)}}\exp\left[-\frac{1}{2}(\bD - \bv\tlag)^\T W(\tlag)^{-1}(\bD - \bv\tlag)\right],
+\qquad W(\tlag) = W + \Sigma_V\tlag^2 ,
+\label{eq:correlation_spread}
+\end{equation}
+%
+with $\rho(\tlag) = \rphi(\tlag/\taud)$ the decorrelation. The factors in front of the exponential are common to the auto- and the cross-correlation, so that the crossing obeys \Eqref{eq:crossing} with the shape at the crossing lag, $\bD^\T W(\taue)^{-1}(\bD - 2\bv\taue) = 0$. For round pulses with an isotropic spread, $\Sigma_V = \sigma_v^2 I$, $W(\taue)$ is a multiple of the identity and the crossing time gives the mean velocity. Otherwise $W(\taue)$ is rounder than the zero-lag shape that FCA uses, and FCA keeps part of the barber-pole error.
+
+\Figref{fig:scan_spread} shows both cases. The spread adds to the decorrelation, and the time delays overestimate more as it grows. For round pulses the crossing time and FCA give the mean velocity up to the largest spread, half the mean speed. For tilted pulses the FCA error stays small while the spread is small against the mean speed, and grows fast above that, together with its scatter.
+
+\begin{figure}
+\centering
+\includegraphics{scan_spread}
+\caption{Pulses of lifetime $5\ell/v$ with normally distributed velocities, against the standard deviation $\sigma_v$ of each component: round pulses (top), and $\ell_1/\ell_2 = 2$, $\alpha = 30^\circ$ (bottom). Panels and symbols as in \Figref{fig:scan_lifetime}; the lines use \Eqref{eq:correlation_spread}.}
+\label{fig:scan_spread}
+\end{figure}
+
+\subsection{Separation}
+
+The biases of the time delays and of the crossing time do not depend on the separation of the pixels (\Figref{fig:scan_spacing}). FCA gives the velocity for separations up to the pulse size. Above it the crossing of the pair along $y$ moves to lags where the correlations have decayed, and the direction scatters. At the largest separation the zero-lag correlation of the diagonal pairs falls below \code{minimum\_correlation}, the fitted shape is not positive definite, and FCA gives no estimate.
+
+\begin{figure}
+\centering
+\includegraphics{scan_spacing}
+\caption{Pulses with $\taud = 2\ell/v$, $\ell_1/\ell_2 = 2$ and $\alpha = 30^\circ$ moving along $x$, against the pixel separation. Panels and symbols as in \Figref{fig:scan_lifetime}. FCA gives no estimate at the largest separation.}
+\label{fig:scan_spacing}
+\end{figure}
+
+\subsection{All properties at random}
+
+In the last set every property is drawn at random, one record per case: the lifetime between $\ell/v$ and $16\ell/v$, the aspect ratio between $1$ and $3$, any tilt and any direction of motion, a spread up to $0.3v$, and a separation between $0.5\ell$ and $1.5\ell$. \Figref{fig:scan_ensemble} shows the distribution of the errors over the cases, and \Tabref{tab:ensemble} their median and ninth decile. The errors of the time delays and of the crossing time are those of the model: the thin and the thick lines coincide, so the bias dominates and a longer record would not reduce them. With a tilt and a direction of motion off the pair, the two-point crossing time gives $(\Wi\bv)_x/\w{xx}$ and not $v_x$. FCA has the smallest error; it exceeds the model's because of the scatter of the late crossings, and FCA gives no estimate in a few cases, all at separations near the upper end.
+
+\begin{figure}
+\centering
+\includegraphics{scan_ensemble}
+\caption{Fraction of the random cases with an error below the abscissa: (a) the component along $x$ from two points, (b) the vector from three points. Thick lines with markers: realizations. Thin lines: the estimators on the model correlation function.}
+\label{fig:scan_ensemble}
+\end{figure}
+
+\begin{table}
+\caption{Errors over the random cases, in units of the speed $\abs{\bv}$: $\abs{\wh{v}_x - v_x}$ for the two-point estimates and $\abs{\wh{\bv} - \bv}$ for the three-point ones. A case without an estimate counts as an error above every other.}
+\label{tab:ensemble}
+\begin{ruledtabular}
+\begin{tabular}{llcccc}
+& & \multicolumn{2}{c}{Realizations} & \multicolumn{2}{c}{Model} \\
+Points & Method & Median & Ninth decile & Median & Ninth decile \\
+\colrule
+Two & 2TDE & 1.13 & 7.19 & 1.14 & 6.96 \\
+Two & Crossing time & 0.19 & 0.62 & 0.19 & 0.60 \\
+Three & 3TDE & 0.47 & 0.80 & 0.48 & 0.80 \\
+Three & Crossing time & 0.41 & 0.82 & 0.38 & 0.80 \\
+Three & FCA & 0.027 & 0.27 & 0.006 & 0.18 \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+%=====================================================================
 \section{Usage}
 \label{sec:usage}
 
@@ -495,6 +690,24 @@ l1, l2 = movie_data.get_l1(), movie_data.get_l2()
 tilt = movie_data.get_tilt()
 \end{lstlisting}
 %
+Time-delay estimation uses three points by default, \Eqref{eq:3tde}, and the two-point estimates of \Eqref{eq:2tde} are chosen with \code{use\_3point\_method}; \code{cc\_options} sets how the delays are found. The realizations of \Secref{sec:realizations} use, in the units of that section,
+%
+\begin{lstlisting}
+import velocity_estimation.time_delay_estimation as tde
+import velocity_estimation.full_correlation_analysis as fca
+
+cc = tde.CCOptions(cc_window=8, minimum_cc_value=0,
+                   interpolate=True)
+two = tdve.EstimationOptions(use_3point_method=False,
+                             cc_options=cc)
+three = tdve.EstimationOptions(cc_options=cc)
+full = tdve.EstimationOptions(
+    velocity_method=tdve.VelocityMethod.FCA,
+    fca_options=fca.FCAOptions(window=8))
+\end{lstlisting}
+%
+and are run and drawn from the repository with \code{python -m fca.scans.run} and \code{python -m fca.scans.figures}.
+
 \code{VelocityMethod.CROSSING} gives the crossing-time velocity of \Eqref{eq:crossing_round} pooled over the pairs, and leaves $\ell_1$, $\ell_2$ and the tilt as NaN. For both methods the options of time-delay estimation (\code{method}, \code{cc\_options}, \code{use\_3point\_method}) are ignored. The tilt is in radians, measured from the first coordinate of the grid.
 
 %=====================================================================
@@ -504,7 +717,8 @@ tilt = movie_data.get_tilt()
 \begin{itemize}
 \item \Eqref{eq:shape} holds for Gaussian pulses. For other shapes $-2\ln R(\bD,0)$ is not quadratic in \bD, and the fitted \Wi{} depends on the separations used. The crossing equation~\eqref{eq:crossing} holds for any elliptic shape.
 \item The noise correction removes white noise only. Coherent pickup and cross-talk between neighbouring channels raise $R(\bD,0)$ and the cross-correlations, and are not corrected.
-\item The model has one velocity. With a spread of velocities, of covariance $\Sigma_V$, the shape of the correlation broadens with the lag, $W(\tlag) = W + \Sigma_V\tlag^2$, which the zero-lag shape does not contain.
+\item The model has one velocity. With a spread of velocities the shape of the correlation broadens with the lag, \Eqref{eq:correlation_spread}, which the zero-lag shape does not contain. FCA then keeps part of the barber-pole error of elongated, tilted structures, and its scatter grows (\Figref{fig:scan_spread}).
+\item A pair across the motion has no crossing, and a pair nearly across it has one at a long lag. In a record of finite length the crossing is then found in the tails of the correlation functions, and the component of the crossing time and of FCA along that pair scatters more than that of the 3TDE (\Figsref{fig:scan_lifetime}{fig:scan_angle}). The same happens at separations above the pulse size (\Figref{fig:scan_spacing}).
 \item The extrapolation of \Eqref{eq:spike_free} needs a sampling time well below the correlation time.
 \item The shape fit needs separations comparable to the correlation lengths. On a grid much finer than the pulses every $R(\bD,0)$ is close to one, and the error of $\ln R$ is amplified by about $(\ell/\Delta)^2$ in \Wi{} and in the FCA velocity. Spaced-antenna measurements place the sensors at separations where $R(\bD,0)$ is of the order of one half: closer, the FCA speed comes out too small, and farther apart the analysis often fails~\cite{briggs_analysis_1984}. The low speed at small separations, the \emph{triangle size effect}, has been traced to uncorrected noise~\cite{meek_triangle_1990,holdsworth_simple_1995} and to other instrumental errors~\cite{holdsworth_influence_1999}; the normalization of \Secref{sec:data} removes the white-noise part. Larger separations (\code{max\_separation}) condition the fit better, as long as the pairs across the short axis keep $R(\bD,0)$ above \code{minimum\_correlation}. The fit weights all pairs equally and uses the zero lag only; a least-squares fit to the cross-correlations at all lags~\cite{fedor_statistical_1967,baker_estimation_1981} would use more of the data, and is not implemented.
 \end{itemize}
